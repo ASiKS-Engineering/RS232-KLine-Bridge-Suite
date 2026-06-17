@@ -1137,11 +1137,13 @@ class BridgeGui(ctk.CTk):
         else:
             self._connect_serial()
 
-    def _connect_serial(self):
+    def _connect_serial(self) -> tuple[bool, str]:
+        """Connect to serial port. Returns (success: bool, message: str)."""
         port = self.port_option.get().strip()
         if not port or port == "-":
+            msg = "No port selected."
             messagebox.showwarning("Port fehlt", "Bitte seriellen Port waehlen.")
-            return
+            return False, f"ERROR: {msg}"
 
         self._close_bootloader_serial()
         self.bootloader_ready = False
@@ -1150,8 +1152,9 @@ class BridgeGui(ctk.CTk):
         try:
             baud = int(self.baud_combo.get().strip())
         except ValueError:
+            msg = "Invalid port baudrate."
             messagebox.showwarning("Baudrate", "Ungueltige Baudrate.")
-            return
+            return False, f"ERROR: {msg}"
 
         self.selected_port_baud = self._normalize_baud_value(str(baud), self.DEFAULT_PORT_BAUD)
         self._save_app_config()
@@ -1160,8 +1163,9 @@ class BridgeGui(ctk.CTk):
             self.serial_port = serial.Serial(port=port, baudrate=baud, timeout=0.2, write_timeout=1.0)
             self.serial_port.dtr = False
         except serial.SerialException as exc:
-            messagebox.showerror("Connect Fehler", str(exc))
-            return
+            msg = str(exc)
+            messagebox.showerror("Connect Fehler", msg)
+            return False, f"ERROR: {msg}"
 
         self.reader_stop_event.clear()
         self.reader_thread = threading.Thread(target=self._reader_loop, daemon=True)
@@ -1172,10 +1176,12 @@ class BridgeGui(ctk.CTk):
         self.dtr_switch.select()
         self.serial_port.dtr = True
         self._update_dtr_indicator(True)
-        self._log(f"Connected to {port} @ {baud}.")
+        msg = f"Connected to {port} @ {baud}."
+        self._log(msg)
         self._log("DTR set to ON (auto).")
         self._request_bridge_version()
         self._refresh_statistics_display()
+        return True, "SUCCESS"
 
     def _disconnect_serial(self):
         self.reader_stop_event.set()
@@ -1472,9 +1478,7 @@ class BridgeGui(ctk.CTk):
             self.eeprom_path_entry.insert(0, file_path)
 
     def _connect_to_bootloader(self):
-        if not self._can_send_bridge_commands():
-            return
-
+        """Connect to bootloader: auto-connect bridge if needed, send reset, wait 1s, open bootloader."""
         port = self.port_option.get().strip()
         baud_text = self.baud_combo.get().strip()
         if not port or port == "-":
@@ -1488,7 +1492,26 @@ class BridgeGui(ctk.CTk):
 
         self.boot_connect_btn.configure(state="disabled")
 
+        # Ensure bridge connection exists
+        if not self.serial_port or not self.serial_port.is_open:
+            self._log("Bootloader connect: no bridge connection, establishing...")
+            ok, result = self._connect_serial()
+            if not ok:
+                self._log(f"Bootloader connect: {result}")
+                self.boot_connect_btn.configure(state="normal")
+                return
+            self._log("Bootloader connect: bridge connection established.")
+            time.sleep(0.2)  # Give reader thread time to start
+
+        # Check DTR is active
+        if not bool(self.dtr_switch.get()):
+            self._log("ERROR: DTR not active. Cannot send reset command.")
+            self.boot_connect_btn.configure(state="normal")
+            return
+
+        # Send reset command
         if not self._send_set_command_with_ack("-set resetbr 1", show_warnings=True, timeout=1.0):
+            self._log("ERROR: Reset command failed.")
             self.boot_connect_btn.configure(state="normal")
             return
 
