@@ -36,6 +36,7 @@ Professionelle Python-GUI fuer eine RS232-KLine-Bridge mit folgenden Funktionen:
 ## Start
 
 ```powershell
+cd C:\Users\q259338\source\kline_bridge_gui
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
