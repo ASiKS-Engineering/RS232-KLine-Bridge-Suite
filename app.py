@@ -1140,7 +1140,7 @@ class BridgeGui(ctk.CTk):
         else:
             self._connect_serial()
 
-    def _connect_serial(self) -> tuple[bool, str]:
+    def _connect_serial(self, request_version: bool = True) -> tuple[bool, str]:
         """Connect to serial port. Returns (success: bool, message: str)."""
         port = self.port_option.get().strip()
         if not port or port == "-":
@@ -1182,7 +1182,8 @@ class BridgeGui(ctk.CTk):
         msg = f"Connected to {port} @ {baud}."
         self._log(msg)
         self._log("DTR set to ON (auto).")
-        self._request_bridge_version()
+        if request_version:
+            self._request_bridge_version()
         self._refresh_statistics_display()
         return True, "SUCCESS"
 
@@ -1297,6 +1298,15 @@ class BridgeGui(ctk.CTk):
             return
         self.awaiting_version_response = False
         self._log("Version request timeout.")
+
+    def _cancel_version_request(self):
+        if self.version_timeout_after_id is not None:
+            try:
+                self.after_cancel(self.version_timeout_after_id)
+            except Exception:
+                pass
+            self.version_timeout_after_id = None
+        self.awaiting_version_response = False
 
     def _set_bridge_fw_version(self, text: str):
         self.bridge_fw_version = text.strip() if text else "-"
@@ -1498,13 +1508,16 @@ class BridgeGui(ctk.CTk):
         # Ensure bridge connection exists
         if not self.serial_port or not self.serial_port.is_open:
             self._log("Bootloader connect: no bridge connection, establishing...")
-            ok, result = self._connect_serial()
+            ok, result = self._connect_serial(request_version=False)
             if not ok:
                 self._log(f"Bootloader connect: {result}")
                 self.boot_connect_btn.configure(state="normal")
                 return
             self._log("Bootloader connect: bridge connection established.")
             time.sleep(0.2)  # Give reader thread time to start
+
+        # Avoid a parallel version request while waiting for reset ACK.
+        self._cancel_version_request()
 
         # Check DTR is active
         if not bool(self.dtr_switch.get()):
@@ -1513,7 +1526,7 @@ class BridgeGui(ctk.CTk):
             return
 
         # Send reset command
-        if not self._send_set_command_with_ack("-set resetbr 1", show_warnings=True, timeout=1.0):
+        if not self._send_set_command_with_ack("-set resetbr 1", show_warnings=True, timeout=1.8):
             self._log("ERROR: Reset command failed.")
             self.boot_connect_btn.configure(state="normal")
             return
