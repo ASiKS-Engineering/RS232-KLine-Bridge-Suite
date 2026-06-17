@@ -1233,6 +1233,9 @@ class BridgeGui(ctk.CTk):
                                 if response_key == "set_ack" and not self._is_set_ack_response(msg):
                                     # Keep waiting for SUCCESS/ERR while ignoring unrelated lines.
                                     pass
+                                elif response_key == "reset_ack" and not self._is_reset_ack_response(msg):
+                                    # Reset path waits explicitly for SUCCESS or ERR.
+                                    pass
                                 else:
                                     self.awaiting_response_value = msg
                                     if response_key in self.bridge_stats_values:
@@ -1318,8 +1321,14 @@ class BridgeGui(ctk.CTk):
         self.bridge_fw_label.configure(text=self.bridge_fw_version)
         self._refresh_statistics_display()
 
+    def _normalize_ack_text(self, message: str) -> str:
+        raw = (message or "").strip().upper()
+        # Drop control chars that may prefix serial payloads (e.g. NUL before SUCCESS).
+        filtered = "".join(ch for ch in raw if ch >= " " or ch == "\t")
+        return " ".join(filtered.split())
+
     def _is_set_ack_response(self, message: str) -> bool:
-        normalized = " ".join((message or "").strip().upper().split())
+        normalized = self._normalize_ack_text(message)
         if not normalized:
             return False
         if normalized.startswith("ERR"):
@@ -1330,9 +1339,37 @@ class BridgeGui(ctk.CTk):
             return True
         if normalized == "OK":
             return True
-        if " SUCCESS " in f" {normalized} ":
+        if "SUCCESS" in normalized:
             return True
         return False
+
+    def _is_reset_ack_response(self, message: str) -> bool:
+        normalized = self._normalize_ack_text(message)
+        if not normalized:
+            return False
+        if normalized.startswith("ERR"):
+            return True
+        if normalized.startswith("SUC"):
+            return True
+        if "SUCCESS" in normalized:
+            return True
+        return False
+
+    def _send_reset_and_wait_success(self, timeout: float = 2.5) -> tuple[bool, str]:
+        self._set_processing(True)
+        try:
+            ok, response = self._query_bridge_value("-set resetbr 1", "reset_ack", timeout=timeout)
+            if not ok:
+                return False, response
+
+            normalized = self._normalize_ack_text(response)
+            if normalized.startswith("SUC") or "SUCCESS" in normalized:
+                return True, response
+            if normalized.startswith("ERR"):
+                return False, response
+            return False, f"Unerwartete Reset-Antwort: {response}"
+        finally:
+            self._set_processing(False)
 
     def _can_send_bridge_commands(self, show_warnings: bool = True) -> bool:
         if not self.serial_port or not self.serial_port.is_open:
@@ -1355,7 +1392,7 @@ class BridgeGui(ctk.CTk):
             return
         self._write_serial_line(command)
 
-    def _send_set_command_with_ack(self, command: str, show_warnings: bool = True, timeout: float = 1.2) -> bool:
+    def _send_set_command_with_ack(self, command: str, show_warnings: bool = True, timeout: float = 2.0) -> bool:
         self._set_processing(True)
         try:
             ok, response = self._query_bridge_value(command, "set_ack", timeout=timeout)
@@ -1364,8 +1401,8 @@ class BridgeGui(ctk.CTk):
                     messagebox.showwarning("Bridge", f"Keine gueltige Antwort fuer {command}: {response}")
                 return False
 
-            normalized = " ".join((response or "").strip().upper().split())
-            if normalized.startswith("SUC") or " SUCCESS" in f" {normalized} " or normalized == "OK" or normalized.startswith("ACK"):
+            normalized = self._normalize_ack_text(response)
+            if normalized.startswith("SUC") or "SUCCESS" in normalized or normalized == "OK" or normalized.startswith("ACK"):
                 self._log(f"Set acknowledged: {command} -> {response}")
                 return True
 
@@ -1546,13 +1583,14 @@ class BridgeGui(ctk.CTk):
             self.boot_connect_btn.configure(state="normal")
             return
 
-        # Send reset command
-        if not self._send_set_command_with_ack("-set resetbr 1", show_warnings=True, timeout=1.8):
-            self._log("ERROR: Reset command failed.")
+        # Send reset command and wait explicitly for SUCCESS.
+        ok, reset_response = self._send_reset_and_wait_success(timeout=1.8)
+        if not ok:
+            self._log(f"ERROR: Reset command failed: {reset_response}")
             self.boot_connect_btn.configure(state="normal")
             return
 
-        self._log("Bootloader connect: reset command sent (-set resetbr).")
+        self._log(f"Bootloader connect: reset command confirmed: {reset_response}")
         self._log("Waiting 1s for bridge reset...")
         self._disconnect_serial()
         self._log("Bridge connection closed.")
