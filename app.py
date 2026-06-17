@@ -1584,13 +1584,17 @@ class BridgeGui(ctk.CTk):
             return
 
         # Send reset command and wait explicitly for SUCCESS.
-        ok, reset_response = self._send_reset_and_wait_success(timeout=1.8)
+        ok, reset_response = self._send_reset_and_wait_success(timeout=2.5)
         if not ok:
-            self._log(f"ERROR: Reset command failed: {reset_response}")
-            self.boot_connect_btn.configure(state="normal")
-            return
-
-        self._log(f"Bootloader connect: reset command confirmed: {reset_response}")
+            if reset_response == "TIMEOUT":
+                # Some bridge firmware resets immediately and never returns a textual ACK.
+                self._log("WARN: Reset ACK timeout; continuing with bootloader connect.")
+            else:
+                self._log(f"ERROR: Reset command failed: {reset_response}")
+                self.boot_connect_btn.configure(state="normal")
+                return
+        else:
+            self._log(f"Bootloader connect: reset command confirmed: {reset_response}")
         self._log("Waiting 1s for bridge reset...")
         self._disconnect_serial()
         self._log("Bridge connection closed.")
