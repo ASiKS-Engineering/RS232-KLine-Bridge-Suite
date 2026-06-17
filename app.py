@@ -116,6 +116,7 @@ class BridgeGui(ctk.CTk):
         self.awaiting_response_event = None
         self.awaiting_response_value = ""
         self.awaiting_response_lock = threading.Lock()
+        self.bridge_query_lock = threading.Lock()
         self.suspend_param_autosend = False
         self.param_autosend_jobs = {}
         self.tooltip_window = None
@@ -833,30 +834,32 @@ class BridgeGui(ctk.CTk):
 
     def _query_bridge_value(self, command: str, key: str, timeout: float = 1.5):
         timeout = self._sanitize_timeout(timeout, self._get_timeout_for_command(command))
-        event = threading.Event()
-        with self.awaiting_response_lock:
-            self.awaiting_response_key = key
-            self.awaiting_response_event = event
-            self.awaiting_response_value = ""
-
-        if not self._write_serial_line(command):
+        # Only one in-flight query is supported by the shared awaiting_response state.
+        with self.bridge_query_lock:
+            event = threading.Event()
             with self.awaiting_response_lock:
+                self.awaiting_response_key = key
+                self.awaiting_response_event = event
+                self.awaiting_response_value = ""
+
+            if not self._write_serial_line(command):
+                with self.awaiting_response_lock:
+                    self.awaiting_response_key = None
+                    self.awaiting_response_event = None
+                return False, "ERR(write)"
+
+            if not event.wait(timeout=timeout):
+                with self.awaiting_response_lock:
+                    self.awaiting_response_key = None
+                    self.awaiting_response_event = None
+                return False, "TIMEOUT"
+
+            with self.awaiting_response_lock:
+                value = self.awaiting_response_value
                 self.awaiting_response_key = None
                 self.awaiting_response_event = None
-            return False, "ERR(write)"
 
-        if not event.wait(timeout=timeout):
-            with self.awaiting_response_lock:
-                self.awaiting_response_key = None
-                self.awaiting_response_event = None
-            return False, "TIMEOUT"
-
-        with self.awaiting_response_lock:
-            value = self.awaiting_response_value
-            self.awaiting_response_key = None
-            self.awaiting_response_event = None
-
-        return True, value
+            return True, value
 
     def _extract_numeric_value(self, text: str):
         if not text:
@@ -1330,8 +1333,8 @@ class BridgeGui(ctk.CTk):
                     messagebox.showwarning("Bridge", f"Keine gueltige Antwort fuer {command}: {response}")
                 return False
 
-            normalized = (response or "").strip().upper()
-            if normalized.startswith("SUC"):
+            normalized = " ".join((response or "").strip().upper().split())
+            if normalized.startswith("SUC") or " SUCCESS" in f" {normalized} " or normalized == "OK" or normalized.startswith("ACK"):
                 self._log(f"Set acknowledged: {command} -> {response}")
                 return True
 
