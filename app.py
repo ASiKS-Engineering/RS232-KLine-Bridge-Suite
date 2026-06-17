@@ -1561,14 +1561,14 @@ class BridgeGui(ctk.CTk):
         self._refresh_statistics_display()
 
     def _bootloader_handshake(self, boot_ser: serial.Serial):
-        deadline = time.time() + 8.0
+        success_deadline = None
         try:
             boot_ser.reset_input_buffer()
             boot_ser.reset_output_buffer()
         except Exception:
             pass
 
-        while time.time() < deadline:
+        while True:
             try:
                 boot_ser.write(b"U")
                 boot_ser.flush()
@@ -1581,13 +1581,17 @@ class BridgeGui(ctk.CTk):
 
             text = response.decode("ascii", errors="replace").strip()
             if "c45b2" not in text:
+                # Start timeout only after first response received
+                if success_deadline is None:
+                    success_deadline = time.time() + 8.0
+                # Check if we've exceeded timeout waiting for success
+                if time.time() > success_deadline:
+                    return False, "Timeout waiting for bootloader identifier"
                 continue
 
             token = text.split("c45b2", maxsplit=1)[1].strip()
             version = token if token else "unknown"
             return True, version
-
-        return False, "Timeout waiting for bootloader identifier"
 
     def _flash_firmware(self):
         self._start_flash("firmware")
