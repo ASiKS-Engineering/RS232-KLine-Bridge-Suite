@@ -1229,10 +1229,15 @@ class BridgeGui(ctk.CTk):
                         response_key = self.awaiting_response_key
                         response_event = self.awaiting_response_event
                         if response_key and response_event and not response_event.is_set():
-                            self.awaiting_response_value = msg
-                            if response_key in self.bridge_stats_values:
-                                self.bridge_stats_values[response_key] = self._normalize_bridge_stat_value(response_key, msg)
-                            response_event.set()
+                            if msg:
+                                if response_key == "set_ack" and not self._is_set_ack_response(msg):
+                                    # Keep waiting for SUCCESS/ERR while ignoring unrelated lines.
+                                    pass
+                                else:
+                                    self.awaiting_response_value = msg
+                                    if response_key in self.bridge_stats_values:
+                                        self.bridge_stats_values[response_key] = self._normalize_bridge_stat_value(response_key, msg)
+                                    response_event.set()
                     if self.awaiting_version_response and msg:
                         if self.version_timeout_after_id is not None:
                             try:
@@ -1312,6 +1317,22 @@ class BridgeGui(ctk.CTk):
         self.bridge_fw_version = text.strip() if text else "-"
         self.bridge_fw_label.configure(text=self.bridge_fw_version)
         self._refresh_statistics_display()
+
+    def _is_set_ack_response(self, message: str) -> bool:
+        normalized = " ".join((message or "").strip().upper().split())
+        if not normalized:
+            return False
+        if normalized.startswith("ERR"):
+            return True
+        if normalized.startswith("SUC"):
+            return True
+        if normalized.startswith("ACK"):
+            return True
+        if normalized == "OK":
+            return True
+        if " SUCCESS " in f" {normalized} ":
+            return True
+        return False
 
     def _can_send_bridge_commands(self, show_warnings: bool = True) -> bool:
         if not self.serial_port or not self.serial_port.is_open:
