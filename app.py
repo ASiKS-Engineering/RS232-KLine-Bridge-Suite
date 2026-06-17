@@ -1493,20 +1493,25 @@ class BridgeGui(ctk.CTk):
             return
 
         self._log("Bootloader connect: reset command sent (-set resetbr).")
+        self._log("Waiting 1s for bridge reset...")
         self._disconnect_serial()
+        self._log("Bridge connection closed.")
         threading.Thread(target=self._bootloader_connect_worker, args=(port, baud), daemon=True).start()
 
     def _bootloader_connect_worker(self, port: str, baud: int):
-        time.sleep(0.8)
+        time.sleep(1.0)
+        self._log("Opening bootloader connection...")
 
         try:
             boot_ser = serial.Serial(port=port, baudrate=baud, timeout=0.2, write_timeout=1.0)
         except serial.SerialException as exc:
+            self._log(f"Bootloader open failed: {exc}")
             self.after(0, lambda: self._finish_bootloader_connect(False, "", f"Open failed: {exc}"))
             return
 
         ok, version_or_error = self._bootloader_handshake(boot_ser)
         if not ok:
+            self._log(f"Bootloader handshake failed: {version_or_error}")
             try:
                 boot_ser.close()
             except Exception:
@@ -1515,6 +1520,7 @@ class BridgeGui(ctk.CTk):
             return
 
         self.bootloader_serial = boot_ser
+        self._log(f"Bootloader connected: {version_or_error}")
         self.after(0, lambda: self._finish_bootloader_connect(True, version_or_error, ""))
 
     def _finish_bootloader_connect(self, connected: bool, version: str, error_text: str):
