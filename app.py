@@ -68,38 +68,42 @@ class BridgeGui(ctk.CTk):
         self.selected_rs232_baud = self.DEFAULT_RS232_BAUD
         self.build_info = self._detect_build_info()
         self.active_tab_name = ""
+
+        # Central command registry: keep all bridge/bootloader commands in one place.
+        self.commands = self._build_command_registry()
+
         self.bridge_stat_request_commands = [
-            ("-get rs232rs", "rs232rs"),
-            ("-get rs232ts", "rs232ts"),
-            ("-get kliners", "kliners"),
-            ("-get klinets", "klinets"),
-            ("-get rs232re", "rs232re"),
-            ("-get klinere", "klinere"),
+            (self.commands["bridge_get"]["rs232rs"], "rs232rs"),
+            (self.commands["bridge_get"]["rs232ts"], "rs232ts"),
+            (self.commands["bridge_get"]["kliners"], "kliners"),
+            (self.commands["bridge_get"]["klinets"], "klinets"),
+            (self.commands["bridge_get"]["rs232re"], "rs232re"),
+            (self.commands["bridge_get"]["klinere"], "klinere"),
         ]
         self.config_upload_commands = [
-            ("-get rs232rx", "rs232rx"),
-            ("-get rs232tx", "rs232tx"),
-            ("-get rs232br", "rs232br"),
-            ("-get klinerx", "klinerx"),
-            ("-get klinetx", "klinetx"),
-            ("-get klinebr", "klinebr"),
-            ("-get dtr_fwd", "dtr_fwd"),
+            (self.commands["bridge_get"]["rs232rx"], "rs232rx"),
+            (self.commands["bridge_get"]["rs232tx"], "rs232tx"),
+            (self.commands["bridge_get"]["rs232br"], "rs232br"),
+            (self.commands["bridge_get"]["klinerx"], "klinerx"),
+            (self.commands["bridge_get"]["klinetx"], "klinetx"),
+            (self.commands["bridge_get"]["klinebr"], "klinebr"),
+            (self.commands["bridge_get"]["dtr_fwd"], "dtr_fwd"),
         ]
         self.get_command_timeouts = {
-            "-get version": 1.2,
-            "-get rs232rs": 1.5,
-            "-get rs232ts": 1.5,
-            "-get kliners": 1.5,
-            "-get klinets": 1.5,
-            "-get rs232re": 1.5,
-            "-get klinere": 1.5,
-            "-get rs232rx": 1.7,
-            "-get rs232tx": 1.7,
-            "-get rs232br": 1.7,
-            "-get klinerx": 1.7,
-            "-get klinetx": 1.7,
-            "-get klinebr": 1.7,
-            "-get dtr_fwd": 1.7,
+            self.commands["bridge_get"]["version"]: 1.2,
+            self.commands["bridge_get"]["rs232rs"]: 1.5,
+            self.commands["bridge_get"]["rs232ts"]: 1.5,
+            self.commands["bridge_get"]["kliners"]: 1.5,
+            self.commands["bridge_get"]["klinets"]: 1.5,
+            self.commands["bridge_get"]["rs232re"]: 1.5,
+            self.commands["bridge_get"]["klinere"]: 1.5,
+            self.commands["bridge_get"]["rs232rx"]: 1.7,
+            self.commands["bridge_get"]["rs232tx"]: 1.7,
+            self.commands["bridge_get"]["rs232br"]: 1.7,
+            self.commands["bridge_get"]["klinerx"]: 1.7,
+            self.commands["bridge_get"]["klinetx"]: 1.7,
+            self.commands["bridge_get"]["klinebr"]: 1.7,
+            self.commands["bridge_get"]["dtr_fwd"]: 1.7,
         }
         self.bridge_stats_values = {key: "-" for _, key in self.bridge_stat_request_commands}
         self.bridge_stat_bit_width = {
@@ -175,6 +179,48 @@ class BridgeGui(ctk.CTk):
             labels.append(label)
             value_map[label] = str(value)
         return labels, value_map
+
+    def _build_command_registry(self) -> dict:
+        return {
+            "bridge_get": {
+                "version": "-get ver",
+                "rs232rs": "-get rrs",
+                "rs232ts": "-get rts",
+                "kliners": "-get krs",
+                "klinets": "-get kts",
+                "rs232re": "-get rre",
+                "klinere": "-get kre",
+                "rs232rx": "-get rrx",
+                "rs232tx": "-get rtx",
+                "rs232br": "-get rbr",
+                "klinerx": "-get krx",
+                "klinetx": "-get ktx",
+                "klinebr": "-get kbr",
+                "dtr_fwd": "-get fwd",
+                "bridgem": "-get brm",
+            },
+            "bridge_set": {
+                "reset": "-set rbr 1",
+                "savecfg": "-set scg",
+                "kline_high": "-set ksh",
+                "kline_low": "-set ksl",
+                "kline_pulse_prefix": "-set ksp",
+                "rs232rx": "-set rrx",
+                "rs232tx": "-set rtx",
+                "rs232br": "-set rbr",
+                "klinerx": "-set krx",
+                "klinetx": "-set ktx",
+                "klinebr": "-set kbr",
+                "dtr_fwd": "-set fwd",
+                "bridgem": "-set brm",
+            },
+            "bootloader": {
+                "handshake": b"U",
+                "program_firmware": b"pf\n",
+                "program_eeprom": b"pe\n",
+                "start_application": b"g\n",
+            },
+        }
 
     def _detect_build_info(self) -> str:
         base_version = f"v{self.APP_VERSION}"
@@ -346,7 +392,7 @@ class BridgeGui(ctk.CTk):
             header,
             text="Reset",
             width=90,
-            command=lambda: self._send_bridge_command("-set resetbr 1"),
+            command=lambda: self._send_bridge_command(self.commands["bridge_set"]["reset"]),
         )
         self.reset_bridge_btn.grid(row=0, column=8, padx=(8, 6), pady=10)
         self._install_tooltip(self.reset_bridge_btn, "Bridge per -set resetbr zuruecksetzen")
@@ -558,31 +604,36 @@ class BridgeGui(ctk.CTk):
             height=40,
             corner_radius=10,
             font=ctk.CTkFont(size=22, weight="bold"),
-            command=lambda: self._send_bridge_command("-set savecfg"),
+            command=lambda: self._send_bridge_command(self.commands["bridge_set"]["savecfg"]),
         )
         self.save_cfg_btn.grid(row=0, column=5, padx=(0, 12), pady=(8, 10), sticky="e")
         self._install_tooltip(self.save_cfg_btn, "Parameter dauerhaft speichern (-set savecfg)")
 
         self.param_entries = {}
         params = [
-            ("RS232 RX Buffer Size", "-set rs232rx", "buffer", 1, 0, 1),
-            ("RS232 TX Buffer Size", "-set rs232tx", "buffer", 2, 0, 1),
-            ("RS232 Baud Rate", "-set rs232br", "baud", 3, 0, 1),
-            ("KLine RX Buffer Size", "-set klinerx", "buffer", 1, 2, 3),
-            ("KLine TX Buffer Size", "-set klinetx", "buffer", 2, 2, 3),
-            ("KLine Baud Rate", "-set klinebr", "baud", 3, 2, 3),
-            ("DTR Forwarding", "-set dtr_fwd", "fwd", 4, 1, 2),
+            ("RS232 RX Buffer Size", self.commands["bridge_set"]["rs232rx"], "buffer", 1, 0, 1),
+            ("RS232 TX Buffer Size", self.commands["bridge_set"]["rs232tx"], "buffer", 2, 0, 1),
+            ("RS232 Baud Rate", self.commands["bridge_set"]["rs232br"], "baud", 3, 0, 1),
+            ("KLine RX Buffer Size", self.commands["bridge_set"]["klinerx"], "buffer", 1, 2, 3),
+            ("KLine TX Buffer Size", self.commands["bridge_set"]["klinetx"], "buffer", 2, 2, 3),
+            ("KLine Baud Rate", self.commands["bridge_set"]["klinebr"], "baud", 3, 2, 3),
+            ("DTR Forwarding", self.commands["bridge_set"]["dtr_fwd"], "fwd", 4, 1, 2),
         ]
 
         for title, cmd, control_type, row, label_col, control_col in params:
-            pady = (12, 6) if cmd == "-set dtr_fwd" else 6
-            if cmd.startswith("-set rs232"):
+            rs232_prefix = self.commands["bridge_set"]["rs232rx"].rsplit("rx", maxsplit=1)[0]
+            kline_prefix = self.commands["bridge_set"]["klinerx"].rsplit("rx", maxsplit=1)[0]
+            dtr_cmd = self.commands["bridge_set"]["dtr_fwd"]
+            kline_baud_cmd = self.commands["bridge_set"]["klinebr"]
+
+            pady = (12, 6) if cmd == dtr_cmd else 6
+            if cmd.startswith(rs232_prefix):
                 label_padx = (12, 6)
                 control_padx = (0, 10)
-            elif cmd.startswith("-set kline"):
+            elif cmd.startswith(kline_prefix):
                 label_padx = (12, 6)
                 control_padx = (0, 10)
-            elif cmd == "-set dtr_fwd":
+            elif cmd == dtr_cmd:
                 label_padx = (8, 2)
                 control_padx = (0, 8)
             else:
@@ -596,7 +647,7 @@ class BridgeGui(ctk.CTk):
                 control.set("64 Bytes")
             elif control_type == "baud":
                 control = ctk.CTkComboBox(settings_frame, values=self.param_baud_values)
-                control.set("10400" if cmd == "-set klinebr" else self.selected_rs232_baud)
+                control.set("10400" if cmd == kline_baud_cmd else self.selected_rs232_baud)
             elif control_type == "fwd":
                 control = ctk.CTkComboBox(settings_frame, values=self.fwd_labels)
                 control.set(self.fwd_labels[1])
@@ -740,8 +791,9 @@ class BridgeGui(ctk.CTk):
     def _drain_log_queue(self):
         while not self.log_queue.empty():
             item = self.log_queue.get_nowait()
-            tab_name, msg = item if isinstance(item, tuple) else ("Configuration", item)
-            log_box = self.log_boxes.get(tab_name, self.log_box)
+            _tab_name, msg = item if isinstance(item, tuple) else ("Configuration", item)
+            # Always write to the tab that is currently visible.
+            log_box = self.log_boxes.get(self.active_tab_name, self.log_box)
             tag = self._log_tag_for_message(msg)
             log_box.insert("end", msg, tag)
             if self.log_autoscroll_var.get():
@@ -906,22 +958,22 @@ class BridgeGui(ctk.CTk):
         self.suspend_param_autosend = True
         try:
             if key == "rs232rx" and numeric is not None:
-                self.param_entries["-set rs232rx"]["widget"].set(f"{numeric} Bytes")
+                self.param_entries[self.commands["bridge_set"]["rs232rx"]]["widget"].set(f"{numeric} Bytes")
             elif key == "rs232tx" and numeric is not None:
-                self.param_entries["-set rs232tx"]["widget"].set(f"{numeric} Bytes")
+                self.param_entries[self.commands["bridge_set"]["rs232tx"]]["widget"].set(f"{numeric} Bytes")
             elif key == "rs232br" and numeric is not None:
                 baud = str(numeric)
-                self.param_entries["-set rs232br"]["widget"].set(baud)
+                self.param_entries[self.commands["bridge_set"]["rs232br"]]["widget"].set(baud)
                 self.selected_rs232_baud = self._normalize_baud_value(baud, self.DEFAULT_RS232_BAUD)
                 self._save_app_config()
             elif key == "klinerx" and numeric is not None:
-                self.param_entries["-set klinerx"]["widget"].set(f"{numeric} Bytes")
+                self.param_entries[self.commands["bridge_set"]["klinerx"]]["widget"].set(f"{numeric} Bytes")
             elif key == "klinetx" and numeric is not None:
-                self.param_entries["-set klinetx"]["widget"].set(f"{numeric} Bytes")
+                self.param_entries[self.commands["bridge_set"]["klinetx"]]["widget"].set(f"{numeric} Bytes")
             elif key == "klinebr" and numeric is not None:
-                self.param_entries["-set klinebr"]["widget"].set(str(numeric))
+                self.param_entries[self.commands["bridge_set"]["klinebr"]]["widget"].set(str(numeric))
             elif key == "dtr_fwd" and numeric is not None:
-                self.param_entries["-set dtr_fwd"]["widget"].set("1 (ein)" if numeric else "0 (aus)")
+                self.param_entries[self.commands["bridge_set"]["dtr_fwd"]]["widget"].set("1 (ein)" if numeric else "0 (aus)")
         finally:
             self.suspend_param_autosend = False
 
@@ -1041,10 +1093,10 @@ class BridgeGui(ctk.CTk):
             self._log(f"Serial write error: {exc}")
 
     def _send_kline_high(self):
-        self._send_bridge_command("-set kline_h")
+        self._send_bridge_command(self.commands["bridge_set"]["kline_high"])
 
     def _send_kline_low(self):
-        self._send_bridge_command("-set kline_l")
+        self._send_bridge_command(self.commands["bridge_set"]["kline_low"])
 
     def _send_kline_pulse(self):
         if not self._can_send_bridge_commands():
@@ -1065,7 +1117,10 @@ class BridgeGui(ctk.CTk):
             messagebox.showwarning("KLine Pulse", "Der Pulse-Wert muss im Bereich 0..65535 ms liegen.")
             return
 
-        self._send_set_command_with_ack(f"-set kline_p {pulse_ms}", show_warnings=True)
+        self._send_set_command_with_ack(
+            f"{self.commands['bridge_set']['kline_pulse_prefix']} {pulse_ms}",
+            show_warnings=True,
+        )
 
     def _on_mode_change(self, selected_mode: str):
         normalized = self._normalize_ui_mode(selected_mode)
@@ -1293,11 +1348,11 @@ class BridgeGui(ctk.CTk):
                 pass
             self.version_timeout_after_id = None
         self.awaiting_version_response = True
-        if not self._write_serial_line("-get version"):
+        if not self._write_serial_line(self.commands["bridge_get"]["version"]):
             self.awaiting_version_response = False
             return
 
-        timeout_ms = int(self._get_timeout_for_command("-get version") * 1000)
+        timeout_ms = int(self._get_timeout_for_command(self.commands["bridge_get"]["version"]) * 1000)
         self.version_timeout_after_id = self.after(timeout_ms, self._on_version_request_timeout)
 
     def _on_version_request_timeout(self):
@@ -1358,7 +1413,7 @@ class BridgeGui(ctk.CTk):
     def _send_reset_and_wait_success(self, timeout: float = 2.5) -> tuple[bool, str]:
         self._set_processing(True)
         try:
-            ok, response = self._query_bridge_value("-set resetbr 1", "reset_ack", timeout=timeout)
+            ok, response = self._query_bridge_value(self.commands["bridge_set"]["reset"], "reset_ack", timeout=timeout)
             if not ok:
                 return False, response
 
@@ -1431,7 +1486,12 @@ class BridgeGui(ctk.CTk):
                 messagebox.showwarning("Wert fehlt", f"Bitte Wert fuer {command} eintragen.")
             return
 
-        if command in {"-set rs232rx", "-set rs232tx", "-set klinerx", "-set klinetx"}:
+        if command in {
+            self.commands["bridge_set"]["rs232rx"],
+            self.commands["bridge_set"]["rs232tx"],
+            self.commands["bridge_set"]["klinerx"],
+            self.commands["bridge_set"]["klinetx"],
+        }:
             is_valid, error_message = self._validate_buffer_twos_complement(value)
             if not is_valid:
                 if show_warnings:
@@ -1443,7 +1503,7 @@ class BridgeGui(ctk.CTk):
         if not sent_ok:
             return
 
-        if command == "-set rs232br":
+        if command == self.commands["bridge_set"]["rs232br"]:
             self.selected_rs232_baud = self._normalize_baud_value(value, self.DEFAULT_RS232_BAUD)
             self._save_app_config()
 
@@ -1483,12 +1543,21 @@ class BridgeGui(ctk.CTk):
         if not raw_value:
             return ""
 
-        if command in {"-set rs232rx", "-set rs232tx", "-set klinerx", "-set klinetx"}:
+        if command in {
+            self.commands["bridge_set"]["rs232rx"],
+            self.commands["bridge_set"]["rs232tx"],
+            self.commands["bridge_set"]["klinerx"],
+            self.commands["bridge_set"]["klinetx"],
+        }:
             if raw_value in self.buffer_value_map:
                 return self.buffer_value_map[raw_value]
             return raw_value
 
-        if command in {"-set rs232br", "-set klinebr", "-set dtr_fwd"}:
+        if command in {
+            self.commands["bridge_set"]["rs232br"],
+            self.commands["bridge_set"]["klinebr"],
+            self.commands["bridge_set"]["dtr_fwd"],
+        }:
             return raw_value.split(" ", maxsplit=1)[0].strip()
 
         return raw_value
@@ -1649,7 +1718,7 @@ class BridgeGui(ctk.CTk):
 
         while True:
             try:
-                boot_ser.write(b"U")
+                boot_ser.write(self.commands["bootloader"]["handshake"])
                 boot_ser.flush()
             except serial.SerialException as exc:
                 return False, f"Write failed: {exc}"
@@ -1738,7 +1807,11 @@ class BridgeGui(ctk.CTk):
             self.after(0, lambda: self._set_flash_busy(False))
             return
 
-        cmd = b"pf\n" if mode == "firmware" else b"pe\n"
+        cmd = (
+            self.commands["bootloader"]["program_firmware"]
+            if mode == "firmware"
+            else self.commands["bootloader"]["program_eeprom"]
+        )
         mode_name = "Flash" if mode == "firmware" else "EEPROM"
 
         if not self._bootloader_enter_programming_mode(ser, cmd, mode_name):
@@ -1909,7 +1982,7 @@ class BridgeGui(ctk.CTk):
             ser.flush()
             time.sleep(0.2)
             ser.reset_input_buffer()
-            ser.write(b"g\n")
+            ser.write(self.commands["bootloader"]["start_application"])
             ser.flush()
             self._log("Bootloader command sent: g (Start Application)")
         except serial.SerialException as exc:
