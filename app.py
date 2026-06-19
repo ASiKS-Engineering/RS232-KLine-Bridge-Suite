@@ -1701,7 +1701,7 @@ class BridgeGui(ctk.CTk):
                 return
 
         cmd = f"{command} {value}"
-        self._log(f"DEBUG param set->rsp->readback start: cmd='{cmd}'")
+        self._log(f"DEBUG param set echo start: cmd='{cmd}'")
         set_ok, set_response = self._query_bridge_value(cmd, "set_rsp", timeout=2.0)
         if not set_ok:
             self.suspend_param_autosend = True
@@ -1726,38 +1726,20 @@ class BridgeGui(ctk.CTk):
             self._update_buffer_fill_indicator()
             return
 
-        # Configuration changes are confirmed by reading back the effective device value.
-        set_to_get = {
-            self.commands["bridge_set"]["rs232rx"]: (self.commands["bridge_get"]["rs232rx"], "rs232rx"),
-            self.commands["bridge_set"]["rs232tx"]: (self.commands["bridge_get"]["rs232tx"], "rs232tx"),
-            self.commands["bridge_set"]["rs232br"]: (self.commands["bridge_get"]["rs232br"], "rs232br"),
-            self.commands["bridge_set"]["klinerx"]: (self.commands["bridge_get"]["klinerx"], "klinerx"),
-            self.commands["bridge_set"]["klinetx"]: (self.commands["bridge_get"]["klinetx"], "klinetx"),
-            self.commands["bridge_set"]["klinebr"]: (self.commands["bridge_get"]["klinebr"], "klinebr"),
-            self.commands["bridge_set"]["dtr_fwd"]: (self.commands["bridge_get"]["dtr_fwd"], "dtr_fwd"),
-        }
-        readback = set_to_get.get(command)
-        if readback is not None:
-            get_command, key = readback
-            time.sleep(self.PARAM_SET_READBACK_DELAY_S)
-            ok, response = self._query_bridge_value(get_command, key, timeout=self._get_timeout_for_command(get_command))
-            if ok:
-                self._log(f"DEBUG param readback: cmd='{cmd}', response='{response}'")
-                self._apply_uploaded_config_value(key, response)
-                if command == self.commands["bridge_set"]["rs232br"]:
-                    resolved = self._resolve_param_value(command, self.param_entries[command]["widget"].get().strip())
-                    self.selected_rs232_baud = self._normalize_baud_value(resolved, self.DEFAULT_RS232_BAUD)
-                    self._save_app_config()
-                return
-            self._log(f"WARN: Readback failed for {command}: {response}")
-            self.suspend_param_autosend = True
-            try:
-                control.set(previous_display)
-            finally:
-                self.suspend_param_autosend = False
-            if show_warnings:
-                messagebox.showwarning("Bridge", f"Ruecklesen fehlgeschlagen fuer {cmd}: {response}")
-            self._update_buffer_fill_indicator()
+        # Device echoes back the value. Determine parameter key from command for UI update.
+        param_key = None
+        for key, cmd_str in self.commands["bridge_set"].items():
+            if cmd_str == command:
+                param_key = key
+                break
+        
+        if param_key is not None:
+            self._log(f"DEBUG param echoed value: cmd='{cmd}', param_key='{param_key}', echo='{set_response}'")
+            self._apply_uploaded_config_value(param_key, set_response)
+            if command == self.commands["bridge_set"]["rs232br"]:
+                resolved = self._resolve_param_value(command, self.param_entries[command]["widget"].get().strip())
+                self.selected_rs232_baud = self._normalize_baud_value(resolved, self.DEFAULT_RS232_BAUD)
+                self._save_app_config()
             return
 
         confirmed_display = raw_value
