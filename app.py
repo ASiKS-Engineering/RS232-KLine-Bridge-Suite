@@ -983,10 +983,13 @@ class BridgeGui(ctk.CTk):
         # Only one in-flight query is supported by the shared awaiting_response state.
         with self.bridge_query_lock:
             event = threading.Event()
+            event_id = id(event)
             with self.awaiting_response_lock:
                 self.awaiting_response_key = key
                 self.awaiting_response_event = event
                 self.awaiting_response_value = ""
+
+            self._log(f"DEBUG await start: key='{key}', cmd='{command}', timeout={timeout:.2f}s, event_id={event_id}")
 
             if not self._write_serial_line(command):
                 with self.awaiting_response_lock:
@@ -995,6 +998,7 @@ class BridgeGui(ctk.CTk):
                 return False, "ERR(write)"
 
             if not event.wait(timeout=timeout):
+                self._log(f"DEBUG await timeout: key='{key}', cmd='{command}', event_id={event_id}")
                 with self.awaiting_response_lock:
                     self.awaiting_response_key = None
                     self.awaiting_response_event = None
@@ -1004,6 +1008,8 @@ class BridgeGui(ctk.CTk):
                 value = self.awaiting_response_value
                 self.awaiting_response_key = None
                 self.awaiting_response_event = None
+
+            self._log(f"DEBUG await done: key='{key}', cmd='{command}', value='{value}', event_id={event_id}")
 
             return True, value
 
@@ -1448,7 +1454,7 @@ class BridgeGui(ctk.CTk):
                     with self.awaiting_response_lock:
                         response_key = self.awaiting_response_key
                         response_event = self.awaiting_response_event
-                        if response_key and response_event and not response_event.is_set():
+                        if response_key is not None and response_event is not None and not response_event.is_set():
                             if msg:
                                 if response_key == "set_ack" and not self._is_set_ack_response(msg):
                                     # Keep waiting for SUCCESS/ERR while ignoring unrelated lines.
@@ -1458,12 +1464,18 @@ class BridgeGui(ctk.CTk):
                                     # Reset path waits explicitly for SUCCESS or ERR.
                                     pass
                                 else:
+                                    self._log(
+                                        f"DEBUG await accept: key='{response_key}', msg='{msg}', event_id={id(response_event)}"
+                                    )
                                     self.awaiting_response_value = msg
                                     if response_key == "set_ack" and self._is_set_success_response(msg):
                                         self.after(0, self._schedule_param_auto_refresh)
                                     if response_key in self.bridge_stats_values:
                                         self.bridge_stats_values[response_key] = self._normalize_bridge_stat_value(response_key, msg)
                                     response_event.set()
+                                    self._log(
+                                        f"DEBUG await signaled: key='{response_key}', event_id={id(response_event)}"
+                                    )
                     if self.awaiting_version_response and msg:
                         if self.version_timeout_after_id is not None:
                             try:
