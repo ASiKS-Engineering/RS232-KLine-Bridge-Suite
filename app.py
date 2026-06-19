@@ -92,7 +92,7 @@ class BridgeGui(ctk.CTk):
             (self.commands["bridge_get"]["klinetx"], "klinetx"),
             (self.commands["bridge_get"]["klinebr"], "klinebr"),
             (self.commands["bridge_get"]["dtr_fwd"], "dtr_fwd"),
-            (self.commands["bridge_get"]["bbm"], "bbm"),
+            (self.commands["bridge_get"]["buffmax"], "bbm"),
         ]
         self.get_command_timeouts = {
             self.commands["bridge_get"]["version"]: 1.2,
@@ -109,7 +109,7 @@ class BridgeGui(ctk.CTk):
             self.commands["bridge_get"]["klinetx"]: 1.7,
             self.commands["bridge_get"]["klinebr"]: 1.7,
             self.commands["bridge_get"]["dtr_fwd"]: 1.7,
-            self.commands["bridge_get"]["bbm"]: 1.7,
+            self.commands["bridge_get"]["buffmax"]: 1.7,
         }
         self.bridge_stats_values = {key: "-" for _, key in self.bridge_stat_request_commands}
         self.bridge_stat_bit_width = {
@@ -141,8 +141,15 @@ class BridgeGui(ctk.CTk):
         self.log_boxes = {}
         self.version_timeout_after_id = None
         self.bridge_max_buffer_size = None
-        self.buffer_fill_progress = None
+        self.buffer_usage_bar = None
+        self.buffer_usage_segments = {}
         self.buffer_fill_status_label = None
+        self.buffer_segment_specs = [
+            ("RS232 RX Buffer", "rs232rx", ("#2563eb", "#3b82f6")),
+            ("RS232 TX Buffer", "rs232tx", ("#0f766e", "#14b8a6")),
+            ("KLine RX Buffer", "klinerx", ("#ca8a04", "#f59e0b")),
+            ("KLine TX Buffer", "klinetx", ("#b91c1c", "#ef4444")),
+        ]
 
         self._load_app_config()
 
@@ -206,7 +213,7 @@ class BridgeGui(ctk.CTk):
                 "klinetx": "-get ktx",
                 "klinebr": "-get kbr",
                 "dtr_fwd": "-get fwd",
-                "bbm": "-get bbm",
+                "buffmax": "-get bbm",
                 "bridgem": "-get brm",
             },
             "bridge_set": {
@@ -671,12 +678,37 @@ class BridgeGui(ctk.CTk):
             control.configure(command=lambda _v=None, c=cmd: self._on_param_control_changed(c))
             control.bind("<Return>", lambda _e, c=cmd: self._on_param_enter_pressed(c))
 
-        ctk.CTkLabel(settings_frame, text="Buffer Fill Level", font=ctk.CTkFont(weight="bold")).grid(
+        ctk.CTkLabel(settings_frame, text="Buffer Usage", font=ctk.CTkFont(weight="bold")).grid(
             row=5, column=0, padx=(12, 6), pady=(12, 10), sticky="w"
         )
-        self.buffer_fill_progress = ctk.CTkProgressBar(settings_frame, height=14)
-        self.buffer_fill_progress.grid(row=5, column=1, columnspan=3, padx=(0, 10), pady=(12, 10), sticky="ew")
-        self.buffer_fill_progress.set(0)
+        self.buffer_usage_bar = ctk.CTkFrame(
+            settings_frame,
+            corner_radius=7,
+            border_width=1,
+            border_color=self.CARD_BORDER,
+            fg_color=("#e5e7eb", "#374151"),
+            height=16,
+        )
+        self.buffer_usage_bar.grid(row=5, column=1, columnspan=3, padx=(0, 10), pady=(12, 10), sticky="ew")
+        self.buffer_usage_bar.grid_propagate(False)
+
+        for index, (title, _key, color) in enumerate(self.buffer_segment_specs):
+            segment = ctk.CTkFrame(
+                self.buffer_usage_bar,
+                corner_radius=0,
+                fg_color=color,
+            )
+            segment.place(relx=0, rely=0, relheight=1, relwidth=0)
+            self.buffer_usage_segments[title] = segment
+
+            legend = ctk.CTkLabel(
+                settings_frame,
+                text=title,
+                font=ctk.CTkFont(size=11),
+                text_color=color,
+            )
+            legend.grid(row=6 + (index // 2), column=(index % 2) * 2, columnspan=2, padx=(12, 6), pady=(0, 6), sticky="w")
+
         self.buffer_fill_status_label = ctk.CTkLabel(
             settings_frame,
             text="Used: 0 B / Max: -",
@@ -1007,56 +1039,62 @@ class BridgeGui(ctk.CTk):
             self.suspend_param_autosend = False
             self._update_buffer_fill_indicator()
 
-    def _current_buffer_sum(self) -> int:
-        total = 0
-        buffer_commands = [
-            self.commands["bridge_set"]["rs232rx"],
-            self.commands["bridge_set"]["rs232tx"],
-            self.commands["bridge_set"]["klinerx"],
-            self.commands["bridge_set"]["klinetx"],
-        ]
-        for command in buffer_commands:
+    def _current_buffer_values(self):
+        values = []
+        for _title, command_key, _color in self.buffer_segment_specs:
+            command = self.commands["bridge_set"][command_key]
             entry = self.param_entries.get(command)
-            if not entry:
-                continue
-            raw = entry["widget"].get().strip()
-            value = self._resolve_param_value(command, raw)
-            try:
-                total += int(value, 10)
-            except Exception:
-                continue
-        return total
+            value_num = 0
+            if entry:
+                raw = entry["widget"].get().strip()
+                value = self._resolve_param_value(command, raw)
+                try:
+                    value_num = int(value, 10)
+                except Exception:
+                    value_num = 0
+            values.append(max(0, value_num))
+        return values
+
+    def _current_buffer_sum(self) -> int:
+        return sum(self._current_buffer_values())
 
     def _update_buffer_fill_indicator(self):
-        if self.buffer_fill_progress is None or self.buffer_fill_status_label is None:
+        if self.buffer_usage_bar is None or self.buffer_fill_status_label is None:
             return
 
-        used = self._current_buffer_sum()
+        accent_color = ("#1f6feb", "#2f81f7")
+        values = self._current_buffer_values()
+        used = sum(values)
         max_value = self.bridge_max_buffer_size if isinstance(self.bridge_max_buffer_size, int) else None
+
         if max_value is None or max_value <= 0:
-            self.buffer_fill_progress.set(0)
-            self.buffer_fill_progress.configure(progress_color=("#9ca3af", "#6b7280"))
+            max_value_for_bar = max(used, 1)
+        else:
+            max_value_for_bar = max_value
+
+        relx = 0.0
+        for index, (title, _key, _color) in enumerate(self.buffer_segment_specs):
+            segment = self.buffer_usage_segments.get(title)
+            if segment is None:
+                continue
+            width = max(0.0, values[index] / max_value_for_bar)
+            # Keep segment ordering stable while preventing overflow beyond 100% width.
+            width = min(width, max(0.0, 1.0 - relx))
+            segment.place_configure(relx=relx, relwidth=width, rely=0, relheight=1)
+            relx += width
+
+        if max_value is None or max_value <= 0:
             self.buffer_fill_status_label.configure(
                 text=f"Used: {used} B / Max: - (read with upload)",
-                text_color=("#4b5563", "#9ca3af"),
+                text_color=accent_color,
             )
             return
 
         ratio = used / max_value
-        clamped = max(0.0, min(1.0, ratio))
-        if ratio < 0.7:
-            color = ("#15803d", "#22c55e")
-        elif ratio < 0.9:
-            color = ("#b45309", "#f59e0b")
-        else:
-            color = ("#b91c1c", "#ef4444")
-
-        self.buffer_fill_progress.set(clamped)
-        self.buffer_fill_progress.configure(progress_color=color)
         percent = int(round(ratio * 100))
         self.buffer_fill_status_label.configure(
             text=f"Used: {used} B / Max: {max_value} B ({percent}%)",
-            text_color=color,
+            text_color=accent_color,
         )
 
     def _upload_bridge_config_worker(self):
