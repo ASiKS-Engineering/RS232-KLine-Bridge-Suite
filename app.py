@@ -1290,7 +1290,7 @@ class BridgeGui(ctk.CTk):
             messagebox.showwarning("KLine Pulse", "Der Pulse-Wert muss im Bereich 0..65535 ms liegen.")
             return
 
-        self._send_set_command_with_ack(
+        self._send_set_command_with_response(
             f"{self.commands['bridge_set']['kline_pulse_prefix']} {pulse_ms}",
             show_warnings=True,
         )
@@ -1467,6 +1467,12 @@ class BridgeGui(ctk.CTk):
                                     )
                                     self.awaiting_response_value = msg
                                     response_event.set()
+                                elif response_key == "set_resp":
+                                    self._log(
+                                        f"DEBUG await accept(set_resp): msg='{msg}', event_id={id(response_event)}"
+                                    )
+                                    self.awaiting_response_value = msg
+                                    response_event.set()
                                 elif response_key == "reset_ack" and not self._is_reset_ack_response(msg):
                                     # Reset path waits explicitly for SUCCESS or ERR.
                                     pass
@@ -1637,41 +1643,35 @@ class BridgeGui(ctk.CTk):
         if not self._can_send_bridge_commands():
             return
         if command.strip().lower().startswith("-set "):
-            self._send_set_command_with_ack(command, show_warnings=True)
+            self._send_set_command_with_response(command, show_warnings=True)
             return
         self._write_serial_line(command)
 
-    def _send_set_command_with_ack(self, command: str, show_warnings: bool = True, timeout: float = 2.0) -> bool:
+    def _send_set_command_with_response(self, command: str, show_warnings: bool = True, timeout: float = 2.0) -> bool:
         self._set_processing(True)
         try:
-            self._log(f"DEBUG set_ack start: cmd='{command}', timeout={timeout:.2f}s")
-            ok, response = self._query_bridge_value(command, "set_ack", timeout=timeout)
+            self._log(f"DEBUG set_cmd start: cmd='{command}', timeout={timeout:.2f}s")
+            ok, response = self._query_bridge_value(command, "set_resp", timeout=timeout)
             if not ok:
-                self._log(f"DEBUG set_ack transport-fail: cmd='{command}', result='{response}'")
+                self._log(f"DEBUG set_cmd transport-fail: cmd='{command}', result='{response}'")
                 if show_warnings:
                     messagebox.showwarning("Bridge", f"Keine gueltige Antwort fuer {command}: {response}")
                 return False
 
-            normalized = self._normalize_ack_text(response)
-            self._log(f"DEBUG set_ack rx: raw='{response}', normalized='{normalized}'")
+            self._log(f"DEBUG set_cmd rx: raw='{response}'")
 
-            if self._is_set_success_response(response):
-                self._log(f"DEBUG set_ack classified: SUCCESS for cmd='{command}'")
-                self._log(f"Set acknowledged: {command} -> {response}")
-                return True
-
+            # Check if response is an error
             if self._is_set_error_response(response):
-                self._log(f"DEBUG set_ack classified: ERROR for cmd='{command}'")
+                self._log(f"DEBUG set_cmd classified: ERROR for cmd='{command}'")
                 self._log(f"Set rejected: {command} -> {response}")
                 if show_warnings:
                     messagebox.showwarning("Bridge ERR", f"Bridge hat den Wert abgelehnt: {response}")
                 return False
 
-            self._log(f"DEBUG set_ack classified: UNEXPECTED for cmd='{command}'")
-            self._log(f"Set unexpected response: {command} -> {response}")
-            if show_warnings:
-                messagebox.showwarning("Bridge", f"Unerwartete Antwort auf {command}: {response}")
-            return False
+            # Any other response is treated as success (device acknowledged by responding)
+            self._log(f"DEBUG set_cmd classified: SUCCESS for cmd='{command}'")
+            self._log(f"Set acknowledged: {command} -> {response}")
+            return True
         finally:
             self._set_processing(False)
 
