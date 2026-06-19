@@ -1,6 +1,7 @@
 import os
 import queue
 import json
+import re
 import threading
 import time
 import subprocess
@@ -1057,17 +1058,24 @@ class BridgeGui(ctk.CTk):
     def _extract_numeric_value(self, text: str):
         if not text:
             return None
-        cleaned = text.strip().replace(",", " ").replace(";", " ")
-        tokens = cleaned.split()
-        for token in tokens:
-            t = token.strip()
-            if t.startswith("0x") or t.startswith("0X"):
-                try:
-                    return int(t, 16)
-                except ValueError:
-                    continue
-            if t.isdigit():
-                return int(t)
+        # Remove hidden control chars from serial payloads (e.g. NUL, STX) before parsing.
+        cleaned = "".join(ch for ch in str(text) if ch >= " " or ch == "\t")
+        cleaned = cleaned.strip().replace(",", " ").replace(";", " ")
+
+        hex_match = re.search(r"(?i)(?:^|\s)([+-]?0x[0-9a-f]+)(?:$|\s)", cleaned)
+        if hex_match:
+            try:
+                return int(hex_match.group(1), 16)
+            except ValueError:
+                pass
+
+        dec_match = re.search(r"(?:^|\s)([+-]?\d+)(?:$|\s)", cleaned)
+        if dec_match:
+            try:
+                return int(dec_match.group(1), 10)
+            except ValueError:
+                pass
+
         return None
 
     def _normalize_bridge_stat_value(self, key: str, raw_value: str) -> str:
@@ -1503,7 +1511,9 @@ class BridgeGui(ctk.CTk):
                                     pass
                                 elif response_key == "set_rsp" and not self._is_set_response_message(msg):
                                     # For parameter echo: ignore messages that aren't valid SET responses
-                                    self._log(f"DEBUG set_rsp ignore (not valid response): '{msg}'")
+                                    self._log(
+                                        f"DEBUG set_rsp ignore: raw='{msg}', reason={self._describe_set_response_match(msg)}"
+                                    )
                                     pass
                                 elif response_key == "set_rsp":
                                     self._log(
@@ -1513,7 +1523,9 @@ class BridgeGui(ctk.CTk):
                                     response_event.set()
                                 elif response_key == "set_resp" and not self._is_set_response_message(msg):
                                     # For SET command responses: ignore messages that aren't valid SET responses
-                                    self._log(f"DEBUG set_resp ignore (not valid response): '{msg}'")
+                                    self._log(
+                                        f"DEBUG set_resp ignore: raw='{msg}', reason={self._describe_set_response_match(msg)}"
+                                    )
                                     pass
                                 elif response_key == "set_resp":
                                     self._log(
@@ -1665,6 +1677,18 @@ class BridgeGui(ctk.CTk):
     def _is_set_response_message(self, message: str) -> bool:
         """Valid response for -set flows: ACK/ERR tokens or numeric echoes."""
         return self._is_set_ack_response(message) or self._is_set_value_echo_response(message)
+
+    def _describe_set_response_match(self, message: str) -> str:
+        """Return why a message was (not) classified as a set response for debugging."""
+        if self._is_set_success_response(message):
+            return "ack-success"
+        if self._is_set_error_response(message):
+            return "ack-error"
+        numeric = self._extract_numeric_value(message)
+        if numeric is not None:
+            return f"value-echo({numeric})"
+        normalized = self._normalize_ack_text(message)
+        return f"no-match normalized='{normalized}'"
 
     def _is_reset_ack_response(self, message: str) -> bool:
         return self._is_set_success_response(message) or self._is_set_error_response(message)
