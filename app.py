@@ -1415,7 +1415,7 @@ class BridgeGui(ctk.CTk):
             return True
         return False
 
-    def _send_reset_and_wait_success(self, timeout: float = 2.5) -> tuple[bool, str]:
+    def _send_reset_and_wait_success(self, timeout: float = 0.05) -> tuple[bool, str]:
         self._set_processing(True)
         try:
             ok, response = self._query_bridge_value(self.commands["bridge_set"]["reset"], "reset_ack", timeout=timeout)
@@ -1658,7 +1658,7 @@ class BridgeGui(ctk.CTk):
             return
 
         # Send reset command and wait explicitly for SUCCESS.
-        ok, reset_response = self._send_reset_and_wait_success(timeout=2.5)
+        ok, reset_response = self._send_reset_and_wait_success(timeout=0.05)
         if not ok:
             if reset_response == "TIMEOUT":
                 # Some bridge firmware resets immediately and never returns a textual ACK.
@@ -1675,7 +1675,7 @@ class BridgeGui(ctk.CTk):
         threading.Thread(target=self._bootloader_connect_worker, args=(port, baud), daemon=True).start()
 
     def _bootloader_connect_worker(self, port: str, baud: int):
-        time.sleep(1.0)
+        time.sleep(0.02)
         max_retries = max(1, int(self.BOOT_CONNECT_MAX_RETRIES))
         retry_delay = max(0.0, float(self.BOOT_CONNECT_RETRY_DELAY_S))
         handshake_timeout = max(0.5, float(self.BOOT_HANDSHAKE_TIMEOUT_S))
@@ -2028,3 +2028,6 @@ class BridgeGui(ctk.CTk):
 if __name__ == "__main__":
     app = BridgeGui()
     app.mainloop()
+
+
+
