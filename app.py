@@ -1618,22 +1618,30 @@ class BridgeGui(ctk.CTk):
     def _send_set_command_with_ack(self, command: str, show_warnings: bool = True, timeout: float = 2.0) -> bool:
         self._set_processing(True)
         try:
+            self._log(f"DEBUG set_ack start: cmd='{command}', timeout={timeout:.2f}s")
             ok, response = self._query_bridge_value(command, "set_ack", timeout=timeout)
             if not ok:
+                self._log(f"DEBUG set_ack transport-fail: cmd='{command}', result='{response}'")
                 if show_warnings:
                     messagebox.showwarning("Bridge", f"Keine gueltige Antwort fuer {command}: {response}")
                 return False
 
+            normalized = self._normalize_ack_text(response)
+            self._log(f"DEBUG set_ack rx: raw='{response}', normalized='{normalized}'")
+
             if self._is_set_success_response(response):
+                self._log(f"DEBUG set_ack classified: SUCCESS for cmd='{command}'")
                 self._log(f"Set acknowledged: {command} -> {response}")
                 return True
 
             if self._is_set_error_response(response):
+                self._log(f"DEBUG set_ack classified: ERROR for cmd='{command}'")
                 self._log(f"Set rejected: {command} -> {response}")
                 if show_warnings:
                     messagebox.showwarning("Bridge ERR", f"Bridge hat den Wert abgelehnt: {response}")
                 return False
 
+            self._log(f"DEBUG set_ack classified: UNEXPECTED for cmd='{command}'")
             self._log(f"Set unexpected response: {command} -> {response}")
             if show_warnings:
                 messagebox.showwarning("Bridge", f"Unerwartete Antwort auf {command}: {response}")
