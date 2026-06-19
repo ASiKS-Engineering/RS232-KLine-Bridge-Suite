@@ -1501,7 +1501,7 @@ class BridgeGui(ctk.CTk):
                                     # Keep waiting for SUCCESS/ERR while ignoring unrelated lines.
                                     self._log(f"DEBUG set_ack ignore: '{msg}'")
                                     pass
-                                elif response_key == "set_rsp" and not self._is_set_ack_response(msg):
+                                elif response_key == "set_rsp" and not self._is_set_response_message(msg):
                                     # For parameter echo: ignore messages that aren't valid SET responses
                                     self._log(f"DEBUG set_rsp ignore (not valid response): '{msg}'")
                                     pass
@@ -1511,7 +1511,7 @@ class BridgeGui(ctk.CTk):
                                     )
                                     self.awaiting_response_value = msg
                                     response_event.set()
-                                elif response_key == "set_resp" and not self._is_set_ack_response(msg):
+                                elif response_key == "set_resp" and not self._is_set_response_message(msg):
                                     # For SET command responses: ignore messages that aren't valid SET responses
                                     self._log(f"DEBUG set_resp ignore (not valid response): '{msg}'")
                                     pass
@@ -1655,6 +1655,16 @@ class BridgeGui(ctk.CTk):
         if normalized.startswith("ERR"):
             return True
         return False
+
+    def _is_set_value_echo_response(self, message: str) -> bool:
+        """Accept numeric/value echoes (e.g. '64', 'kbr=10400') returned by -set commands."""
+        if not message:
+            return False
+        return self._extract_numeric_value(message) is not None
+
+    def _is_set_response_message(self, message: str) -> bool:
+        """Valid response for -set flows: ACK/ERR tokens or numeric echoes."""
+        return self._is_set_ack_response(message) or self._is_set_value_echo_response(message)
 
     def _is_reset_ack_response(self, message: str) -> bool:
         return self._is_set_success_response(message) or self._is_set_error_response(message)
