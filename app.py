@@ -75,13 +75,14 @@ class BridgeGui(ctk.CTk):
         # Central command registry: keep all bridge/bootloader commands in one place.
         self.commands = self._build_command_registry()
 
+        # Statistics use bridge short codes directly so return values map 1:1 to UI labels.
         self.bridge_stat_request_commands = [
-            (self.commands["bridge_get"]["rs232rs"], "rs232rs"),
-            (self.commands["bridge_get"]["rs232ts"], "rs232ts"),
-            (self.commands["bridge_get"]["kliners"], "kliners"),
-            (self.commands["bridge_get"]["klinets"], "klinets"),
-            (self.commands["bridge_get"]["rs232re"], "rs232re"),
-            (self.commands["bridge_get"]["klinere"], "klinere"),
+            (self.commands["bridge_get"]["rs232rs"], "rrs"),
+            (self.commands["bridge_get"]["rs232ts"], "rts"),
+            (self.commands["bridge_get"]["kliners"], "krs"),
+            (self.commands["bridge_get"]["klinets"], "kts"),
+            (self.commands["bridge_get"]["rs232re"], "rre"),
+            (self.commands["bridge_get"]["klinere"], "kre"),
         ]
         self.config_upload_commands = [
             (self.commands["bridge_get"]["rs232rx"], "rs232rx"),
@@ -110,8 +111,8 @@ class BridgeGui(ctk.CTk):
         }
         self.bridge_stats_values = {key: "-" for _, key in self.bridge_stat_request_commands}
         self.bridge_stat_bit_width = {
-            "rs232re": 8,
-            "klinere": 8,
+            "rre": 8,
+            "kre": 8,
         }
         self.uart_error_flags = [
             (0x01, "UART_FRAME_ERROR"),
@@ -459,12 +460,12 @@ class BridgeGui(ctk.CTk):
         self._install_tooltip(self.stats_refresh_btn, "Bridge-Statistiken abfragen und aktualisieren")
 
         bridge_rows = [
-            ("RS232 RX Overflows", "rs232rs", 1, 0),
-            ("KLine RX Overflows", "kliners", 1, 2),
-            ("RS232 TX Overflows", "rs232ts", 2, 0),
-            ("KLine TX Overflows", "klinets", 2, 2),
-            ("RS232 RX Errors",   "rs232re", 3, 0),
-            ("KLine RX Errors",   "klinere", 3, 2),
+            ("RS232 RX Overflows", "rrs", 1, 0),
+            ("KLine RX Overflows", "krs", 1, 2),
+            ("RS232 TX Overflows", "rts", 2, 0),
+            ("KLine TX Overflows", "kts", 2, 2),
+            ("RS232 RX Errors",   "rre", 3, 0),
+            ("KLine RX Errors",   "kre", 3, 2),
         ]
         for title, key, row, col in bridge_rows:
             ctk.CTkLabel(bridge_stats_frame, text=title, font=ctk.CTkFont(weight="bold")).grid(
@@ -942,7 +943,7 @@ class BridgeGui(ctk.CTk):
         bit_width = self.bridge_stat_bit_width.get(key)
         if bit_width:
             numeric &= (1 << bit_width) - 1
-            if key in {"rs232re", "klinere"}:
+            if key in {"rre", "kre"}:
                 return self._decode_uart_error_mask(numeric)
             return str(numeric)
 
