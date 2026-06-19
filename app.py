@@ -1003,8 +1003,10 @@ class BridgeGui(ctk.CTk):
         try:
             self._log("Bridge snapshot refresh started.")
             for command, key in self.bridge_stat_request_commands:
+                self._log(f"TX: {command}")
                 ok, response = self._query_bridge_value(command, key, timeout=self._get_timeout_for_command(command))
                 self.bridge_stats_values[key] = self._normalize_bridge_stat_value(key, response) if ok else response
+                self._log(f"RX: {response}")
 
                 self.after(0, self._refresh_statistics_display)
                 time.sleep(0.03)
