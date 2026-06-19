@@ -473,6 +473,16 @@ class BridgeGui(ctk.CTk):
         self.stats_refresh_btn.grid(row=0, column=3, padx=(0, 10), pady=(10, 8), sticky="e")
         self._install_tooltip(self.stats_refresh_btn, "Bridge-Statistiken abfragen und aktualisieren")
 
+        self.stats_reset_btn = ctk.CTkButton(
+            bridge_stats_frame,
+            text="Reset Statistics",
+            width=150,
+            height=36,
+            command=self._reset_runtime_statistics,
+        )
+        self.stats_reset_btn.grid(row=0, column=2, padx=(0, 10), pady=(10, 8), sticky="e")
+        self._install_tooltip(self.stats_reset_btn, "Runtime-Statistiken zuruecksetzen")
+
         bridge_rows = [
             ("RS232 RX Overflows", "rrs", 1, 0),
             ("KLine RX Overflows", "krs", 1, 2),
@@ -877,8 +887,6 @@ class BridgeGui(ctk.CTk):
         self._log("Runtime statistics reset.")
 
     def _refresh_statistics_display(self):
-        if not self.stats_value_labels:
-            return
         uptime_s = int(max(0, time.time() - self.app_start_time))
         hh = uptime_s // 3600
         mm = (uptime_s % 3600) // 60
@@ -1652,7 +1660,6 @@ class BridgeGui(ctk.CTk):
     def _on_param_control_changed(self, command: str):
         if self.suspend_param_autosend:
             return
-        self._update_buffer_fill_indicator()
         pending_job = self.param_autosend_jobs.pop(command, None)
         if pending_job:
             try:
@@ -1680,7 +1687,6 @@ class BridgeGui(ctk.CTk):
             except Exception:
                 pass
         self._send_param(command, show_warnings=True)
-        self._update_buffer_fill_indicator()
         return "break"
 
     def _resolve_param_value(self, command: str, raw_value: str) -> str:
