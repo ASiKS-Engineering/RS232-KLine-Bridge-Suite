@@ -1618,6 +1618,7 @@ class BridgeGui(ctk.CTk):
 
         control = self.param_entries[command]["widget"]
         raw_value = control.get().strip()
+        previous_display = self.param_confirmed_values.get(command, raw_value)
         value = self._resolve_param_value(command, raw_value)
         if not value:
             if show_warnings:
@@ -1639,17 +1640,36 @@ class BridgeGui(ctk.CTk):
         cmd = f"{command} {value}"
         sent_ok = self._send_set_command_with_ack(cmd, show_warnings=show_warnings)
         if not sent_ok:
-            previous = self.param_confirmed_values.get(command)
-            if previous is not None:
-                self.suspend_param_autosend = True
-                try:
-                    control.set(previous)
-                finally:
-                    self.suspend_param_autosend = False
+            self.suspend_param_autosend = True
+            try:
+                control.set(previous_display)
+            finally:
+                self.suspend_param_autosend = False
             self._update_buffer_fill_indicator()
             return
 
-        self.param_confirmed_values[command] = raw_value
+        confirmed_display = raw_value
+        if command in {
+            self.commands["bridge_set"]["rs232rx"],
+            self.commands["bridge_set"]["rs232tx"],
+            self.commands["bridge_set"]["klinerx"],
+            self.commands["bridge_set"]["klinetx"],
+        }:
+            confirmed_display = f"{value} Bytes"
+            self.suspend_param_autosend = True
+            try:
+                control.set(confirmed_display)
+            finally:
+                self.suspend_param_autosend = False
+        elif command == self.commands["bridge_set"]["dtr_fwd"]:
+            confirmed_display = "1 (ein)" if value == "1" else "0 (aus)"
+            self.suspend_param_autosend = True
+            try:
+                control.set(confirmed_display)
+            finally:
+                self.suspend_param_autosend = False
+
+        self.param_confirmed_values[command] = confirmed_display
 
         if command == self.commands["bridge_set"]["rs232br"]:
             self.selected_rs232_baud = self._normalize_baud_value(value, self.DEFAULT_RS232_BAUD)
