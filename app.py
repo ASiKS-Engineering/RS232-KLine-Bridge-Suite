@@ -24,6 +24,7 @@ class BridgeGui(ctk.CTk):
     DEFAULT_PORT_BAUD = "19200"
     DEFAULT_RS232_BAUD = "19200"
     PARAM_AUTOSEND_DEBOUNCE_MS = 90
+    PARAM_SET_READBACK_DELAY_S = 0.12
     GET_TIMEOUT_DEFAULT = 1.5
     GET_TIMEOUT_MIN = 0.1
     GET_TIMEOUT_MAX = 10.0
@@ -1694,17 +1695,19 @@ class BridgeGui(ctk.CTk):
                 return
 
         cmd = f"{command} {value}"
-        sent_ok = self._send_set_command_with_ack(cmd, show_warnings=show_warnings)
-        if not sent_ok:
+        self._log(f"DEBUG param direct-set start: cmd='{cmd}'")
+        if not self._write_serial_line(cmd):
             self.suspend_param_autosend = True
             try:
                 control.set(previous_display)
             finally:
                 self.suspend_param_autosend = False
+            if show_warnings:
+                messagebox.showwarning("Bridge", f"Senden fehlgeschlagen fuer {cmd}.")
             self._update_buffer_fill_indicator()
             return
 
-        # Read back the confirmed value after SUCCESS so UI always reflects device state.
+        # Configuration changes are confirmed by reading back the effective device value.
         set_to_get = {
             self.commands["bridge_set"]["rs232rx"]: (self.commands["bridge_get"]["rs232rx"], "rs232rx"),
             self.commands["bridge_set"]["rs232tx"]: (self.commands["bridge_get"]["rs232tx"], "rs232tx"),
@@ -1717,8 +1720,10 @@ class BridgeGui(ctk.CTk):
         readback = set_to_get.get(command)
         if readback is not None:
             get_command, key = readback
+            time.sleep(self.PARAM_SET_READBACK_DELAY_S)
             ok, response = self._query_bridge_value(get_command, key, timeout=self._get_timeout_for_command(get_command))
             if ok:
+                self._log(f"DEBUG param direct-set readback: cmd='{cmd}', response='{response}'")
                 self._apply_uploaded_config_value(key, response)
                 if command == self.commands["bridge_set"]["rs232br"]:
                     resolved = self._resolve_param_value(command, self.param_entries[command]["widget"].get().strip())
@@ -1726,6 +1731,15 @@ class BridgeGui(ctk.CTk):
                     self._save_app_config()
                 return
             self._log(f"WARN: Readback failed for {command}: {response}")
+            self.suspend_param_autosend = True
+            try:
+                control.set(previous_display)
+            finally:
+                self.suspend_param_autosend = False
+            if show_warnings:
+                messagebox.showwarning("Bridge", f"Ruecklesen fehlgeschlagen fuer {cmd}: {response}")
+            self._update_buffer_fill_indicator()
+            return
 
         confirmed_display = raw_value
         if command in {
