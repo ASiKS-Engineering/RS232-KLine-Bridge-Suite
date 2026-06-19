@@ -1452,6 +1452,7 @@ class BridgeGui(ctk.CTk):
                             if msg:
                                 if response_key == "set_ack" and not self._is_set_ack_response(msg):
                                     # Keep waiting for SUCCESS/ERR while ignoring unrelated lines.
+                                    self._log(f"DEBUG set_ack ignore: '{msg}'")
                                     pass
                                 elif response_key == "reset_ack" and not self._is_reset_ack_response(msg):
                                     # Reset path waits explicitly for SUCCESS or ERR.
@@ -1556,6 +1557,9 @@ class BridgeGui(ctk.CTk):
         normalized = self._normalize_ack_text(message)
         if not normalized:
             return False
+        tokens = normalized.replace(":", " ").replace(";", " ").replace(",", " ").split()
+        if any(token in {"SUCCESS", "SUC", "OK", "ACK"} for token in tokens):
+            return True
         if normalized.startswith("SUCCESS"):
             return True
         if normalized.startswith("SUC"):
@@ -1570,6 +1574,9 @@ class BridgeGui(ctk.CTk):
         normalized = self._normalize_ack_text(message)
         if not normalized:
             return False
+        tokens = normalized.replace(":", " ").replace(";", " ").replace(",", " ").split()
+        if any(token in {"ERROR", "ERR"} for token in tokens):
+            return True
         if normalized.startswith("ERROR"):
             return True
         if normalized.startswith("ERR"):
