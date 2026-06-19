@@ -130,6 +130,8 @@ class BridgeGui(ctk.CTk):
         self.suspend_param_autosend = False
         self.param_autosend_jobs = {}
         self.param_confirmed_values = {}
+        self.param_refresh_after_id = None
+        self.param_refresh_running = False
         self.tooltip_window = None
         self.tooltip_label = None
         self.tooltip_after_id = None
@@ -937,6 +939,29 @@ class BridgeGui(ctk.CTk):
         self.upload_cfg_btn.configure(state="disabled")
         threading.Thread(target=self._upload_bridge_config_worker, daemon=True).start()
 
+    def _schedule_param_auto_refresh(self):
+        if self.param_refresh_running:
+            return
+        if self.param_refresh_after_id is not None:
+            try:
+                self.after_cancel(self.param_refresh_after_id)
+            except Exception:
+                pass
+        # Debounce repeated replies so rapid ACK bursts trigger only one refresh cycle.
+        self.param_refresh_after_id = self.after(220, self._start_param_auto_refresh)
+
+    def _start_param_auto_refresh(self):
+        self.param_refresh_after_id = None
+        if self.param_refresh_running:
+            return
+        if not self.serial_port or not self.serial_port.is_open:
+            return
+        if not bool(self.dtr_switch.get()):
+            return
+        self.param_refresh_running = True
+        self.upload_cfg_btn.configure(state="disabled")
+        threading.Thread(target=self._upload_bridge_config_worker, daemon=True).start()
+
     def _sanitize_timeout(self, value, default: float) -> float:
         try:
             timeout = float(value)
@@ -1143,6 +1168,7 @@ class BridgeGui(ctk.CTk):
             self._log("Configuration upload completed.")
         finally:
             self._set_processing(False)
+            self.param_refresh_running = False
             self.after(0, lambda: self.upload_cfg_btn.configure(state="normal"))
 
     def _refresh_bridge_statistics_worker(self):
@@ -1432,6 +1458,8 @@ class BridgeGui(ctk.CTk):
                                     pass
                                 else:
                                     self.awaiting_response_value = msg
+                                    if response_key == "set_ack" and self._is_set_ack_response(msg):
+                                        self.after(0, self._schedule_param_auto_refresh)
                                     if response_key in self.bridge_stats_values:
                                         self.bridge_stats_values[response_key] = self._normalize_bridge_stat_value(response_key, msg)
                                     response_event.set()
