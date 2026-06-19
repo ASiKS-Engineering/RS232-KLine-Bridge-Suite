@@ -1458,7 +1458,7 @@ class BridgeGui(ctk.CTk):
                                     pass
                                 else:
                                     self.awaiting_response_value = msg
-                                    if response_key == "set_ack" and self._is_set_ack_response(msg):
+                                    if response_key == "set_ack" and self._is_set_success_response(msg):
                                         self.after(0, self._schedule_param_auto_refresh)
                                     if response_key in self.bridge_stats_values:
                                         self.bridge_stats_values[response_key] = self._normalize_bridge_stat_value(response_key, msg)
@@ -1550,32 +1550,34 @@ class BridgeGui(ctk.CTk):
         return " ".join(filtered.split())
 
     def _is_set_ack_response(self, message: str) -> bool:
+        return self._is_set_success_response(message) or self._is_set_error_response(message)
+
+    def _is_set_success_response(self, message: str) -> bool:
         normalized = self._normalize_ack_text(message)
         if not normalized:
             return False
-        if normalized.startswith("ERR"):
+        if normalized.startswith("SUCCESS"):
             return True
         if normalized.startswith("SUC"):
             return True
-        if normalized.startswith("ACK"):
-            return True
         if normalized == "OK":
             return True
-        if "SUCCESS" in normalized:
+        if normalized == "ACK":
+            return True
+        return False
+
+    def _is_set_error_response(self, message: str) -> bool:
+        normalized = self._normalize_ack_text(message)
+        if not normalized:
+            return False
+        if normalized.startswith("ERROR"):
+            return True
+        if normalized.startswith("ERR"):
             return True
         return False
 
     def _is_reset_ack_response(self, message: str) -> bool:
-        normalized = self._normalize_ack_text(message)
-        if not normalized:
-            return False
-        if normalized.startswith("ERR"):
-            return True
-        if normalized.startswith("SUC"):
-            return True
-        if "SUCCESS" in normalized:
-            return True
-        return False
+        return self._is_set_success_response(message) or self._is_set_error_response(message)
 
     def _send_reset_and_wait_success(self, timeout: float = 0.05) -> tuple[bool, str]:
         self._set_processing(True)
@@ -1584,10 +1586,9 @@ class BridgeGui(ctk.CTk):
             if not ok:
                 return False, response
 
-            normalized = self._normalize_ack_text(response)
-            if normalized.startswith("SUC") or "SUCCESS" in normalized:
+            if self._is_set_success_response(response):
                 return True, response
-            if normalized.startswith("ERR"):
+            if self._is_set_error_response(response):
                 return False, response
             return False, f"Unerwartete Reset-Antwort: {response}"
         finally:
@@ -1623,12 +1624,11 @@ class BridgeGui(ctk.CTk):
                     messagebox.showwarning("Bridge", f"Keine gueltige Antwort fuer {command}: {response}")
                 return False
 
-            normalized = self._normalize_ack_text(response)
-            if normalized.startswith("SUC") or "SUCCESS" in normalized or normalized == "OK" or normalized.startswith("ACK"):
+            if self._is_set_success_response(response):
                 self._log(f"Set acknowledged: {command} -> {response}")
                 return True
 
-            if normalized.startswith("ERR"):
+            if self._is_set_error_response(response):
                 self._log(f"Set rejected: {command} -> {response}")
                 if show_warnings:
                     messagebox.showwarning("Bridge ERR", f"Bridge hat den Wert abgelehnt: {response}")
