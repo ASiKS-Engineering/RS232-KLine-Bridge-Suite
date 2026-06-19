@@ -129,6 +129,7 @@ class BridgeGui(ctk.CTk):
         self.bridge_query_lock = threading.Lock()
         self.suspend_param_autosend = False
         self.param_autosend_jobs = {}
+        self.param_confirmed_values = {}
         self.tooltip_window = None
         self.tooltip_label = None
         self.tooltip_after_id = None
@@ -707,7 +708,7 @@ class BridgeGui(ctk.CTk):
                 font=ctk.CTkFont(size=11),
                 text_color=color,
             )
-            legend.grid(row=6 + (index // 2), column=(index % 2) * 2, columnspan=2, padx=(12, 6), pady=(0, 6), sticky="w")
+            legend.grid(row=6, column=index, columnspan=1, padx=(12, 6), pady=(0, 6), sticky="w")
 
         self.buffer_fill_status_label = ctk.CTkLabel(
             settings_frame,
@@ -1017,22 +1018,42 @@ class BridgeGui(ctk.CTk):
         self.suspend_param_autosend = True
         try:
             if key == "rs232rx" and numeric is not None:
-                self.param_entries[self.commands["bridge_set"]["rs232rx"]]["widget"].set(f"{numeric} Bytes")
+                _cmd = self.commands["bridge_set"]["rs232rx"]
+                _val = f"{numeric} Bytes"
+                self.param_entries[_cmd]["widget"].set(_val)
+                self.param_confirmed_values[_cmd] = _val
             elif key == "rs232tx" and numeric is not None:
-                self.param_entries[self.commands["bridge_set"]["rs232tx"]]["widget"].set(f"{numeric} Bytes")
+                _cmd = self.commands["bridge_set"]["rs232tx"]
+                _val = f"{numeric} Bytes"
+                self.param_entries[_cmd]["widget"].set(_val)
+                self.param_confirmed_values[_cmd] = _val
             elif key == "rs232br" and numeric is not None:
+                _cmd = self.commands["bridge_set"]["rs232br"]
                 baud = str(numeric)
-                self.param_entries[self.commands["bridge_set"]["rs232br"]]["widget"].set(baud)
+                self.param_entries[_cmd]["widget"].set(baud)
+                self.param_confirmed_values[_cmd] = baud
                 self.selected_rs232_baud = self._normalize_baud_value(baud, self.DEFAULT_RS232_BAUD)
                 self._save_app_config()
             elif key == "klinerx" and numeric is not None:
-                self.param_entries[self.commands["bridge_set"]["klinerx"]]["widget"].set(f"{numeric} Bytes")
+                _cmd = self.commands["bridge_set"]["klinerx"]
+                _val = f"{numeric} Bytes"
+                self.param_entries[_cmd]["widget"].set(_val)
+                self.param_confirmed_values[_cmd] = _val
             elif key == "klinetx" and numeric is not None:
-                self.param_entries[self.commands["bridge_set"]["klinetx"]]["widget"].set(f"{numeric} Bytes")
+                _cmd = self.commands["bridge_set"]["klinetx"]
+                _val = f"{numeric} Bytes"
+                self.param_entries[_cmd]["widget"].set(_val)
+                self.param_confirmed_values[_cmd] = _val
             elif key == "klinebr" and numeric is not None:
-                self.param_entries[self.commands["bridge_set"]["klinebr"]]["widget"].set(str(numeric))
+                _cmd = self.commands["bridge_set"]["klinebr"]
+                _val = str(numeric)
+                self.param_entries[_cmd]["widget"].set(_val)
+                self.param_confirmed_values[_cmd] = _val
             elif key == "dtr_fwd" and numeric is not None:
-                self.param_entries[self.commands["bridge_set"]["dtr_fwd"]]["widget"].set("1 (ein)" if numeric else "0 (aus)")
+                _cmd = self.commands["bridge_set"]["dtr_fwd"]
+                _val = "1 (ein)" if numeric else "0 (aus)"
+                self.param_entries[_cmd]["widget"].set(_val)
+                self.param_confirmed_values[_cmd] = _val
             elif key == "bbm" and numeric is not None:
                 self.bridge_max_buffer_size = numeric
         finally:
@@ -1610,7 +1631,17 @@ class BridgeGui(ctk.CTk):
         cmd = f"{command} {value}"
         sent_ok = self._send_set_command_with_ack(cmd, show_warnings=show_warnings)
         if not sent_ok:
+            previous = self.param_confirmed_values.get(command)
+            if previous is not None:
+                self.suspend_param_autosend = True
+                try:
+                    control.set(previous)
+                finally:
+                    self.suspend_param_autosend = False
+            self._update_buffer_fill_indicator()
             return
+
+        self.param_confirmed_values[command] = raw_value
 
         if command == self.commands["bridge_set"]["rs232br"]:
             self.selected_rs232_baud = self._normalize_baud_value(value, self.DEFAULT_RS232_BAUD)
