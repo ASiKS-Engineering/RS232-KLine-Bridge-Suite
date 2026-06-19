@@ -1024,11 +1024,6 @@ class BridgeGui(ctk.CTk):
             "(ohne externe EXE).",
         )
 
-    def _append_terminal_rx(self, text: str):
-        self.terminal_rx_box.insert("end", text + "\n", "rx")
-        if self.log_autoscroll_var.get():
-            self.terminal_rx_box.see("end")
-
     def _parse_hex_bytes(self, payload: str):
         cleaned = payload.replace(",", " ").replace(";", " ").strip()
         if not cleaned:
@@ -1085,12 +1080,7 @@ class BridgeGui(ctk.CTk):
 
             self.serial_port.write(raw)
             self.serial_port.flush()
-            self.terminal_rx_box.insert("end", f"TX: {payload}\n", "tx")
-            if self.log_autoscroll_var.get():
-                self.terminal_rx_box.see("end")
-            self.tx_count += 1
-            self.last_tx = payload[:80] or "-"
-            self.after(0, self._refresh_statistics_display)
+            self._log(f"TX: {payload}")
             self.terminal_input_entry.delete(0, "end")
         except ValueError as exc:
             messagebox.showwarning("Hex Mode", str(exc))
@@ -1284,7 +1274,6 @@ class BridgeGui(ctk.CTk):
                     except Exception:
                         msg = repr(data)
                     self._log(f"RX: {msg}")
-                    self.after(0, lambda m=msg: self._append_terminal_rx(m))
                     with self.awaiting_response_lock:
                         response_key = self.awaiting_response_key
                         response_event = self.awaiting_response_event
