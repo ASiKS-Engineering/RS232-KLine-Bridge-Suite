@@ -230,6 +230,8 @@ class BridgeGui(ctk.CTk):
         channel = (self.APP_CHANNEL or "").strip().lower()
         if channel:
             base_version = f"{base_version}-{channel}"
+        # Timestamp represents build date/time in UTC for reproducible version labels.
+        build_stamp = datetime.utcnow().strftime("%Y%m%d-%H%M%SZ")
         repo_dir = os.path.dirname(__file__)
         try:
             short_hash = subprocess.check_output(
@@ -245,9 +247,9 @@ class BridgeGui(ctk.CTk):
                 text=True,
             ).strip()
             dirty_suffix = ".dirty" if dirty_state else ""
-            return f"{base_version}+{short_hash}{dirty_suffix}"
+            return f"{base_version}+{build_stamp}.{short_hash}{dirty_suffix}"
         except Exception:
-            return base_version
+            return f"{base_version}+{build_stamp}"
 
     def _install_tooltip(self, widget, text: str):
         widget.bind("<Enter>", lambda e, w=widget, t=text: self._schedule_tooltip(w, t, e.x_root, e.y_root), add="+")
@@ -1003,10 +1005,8 @@ class BridgeGui(ctk.CTk):
         try:
             self._log("Bridge snapshot refresh started.")
             for command, key in self.bridge_stat_request_commands:
-                self._log(f"TX: {command}")
                 ok, response = self._query_bridge_value(command, key, timeout=self._get_timeout_for_command(command))
                 self.bridge_stats_values[key] = self._normalize_bridge_stat_value(key, response) if ok else response
-                self._log(f"RX: {response}")
 
                 self.after(0, self._refresh_statistics_display)
                 time.sleep(0.03)
