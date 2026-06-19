@@ -29,6 +29,9 @@ class BridgeGui(ctk.CTk):
     GET_TIMEOUT_MAX = 10.0
     APP_VERSION = "1.0.0"
     APP_CHANNEL = ""
+    BOOT_CONNECT_MAX_RETRIES = 3
+    BOOT_CONNECT_RETRY_DELAY_S = 0.8
+    BOOT_HANDSHAKE_TIMEOUT_S = 8.0
 
     def __init__(self):
         super().__init__()
@@ -1671,28 +1674,43 @@ class BridgeGui(ctk.CTk):
 
     def _bootloader_connect_worker(self, port: str, baud: int):
         time.sleep(1.0)
-        self._log("Opening bootloader connection...")
+        max_retries = max(1, int(self.BOOT_CONNECT_MAX_RETRIES))
+        retry_delay = max(0.0, float(self.BOOT_CONNECT_RETRY_DELAY_S))
+        handshake_timeout = max(0.5, float(self.BOOT_HANDSHAKE_TIMEOUT_S))
+        last_error = "unknown error"
 
-        try:
-            boot_ser = serial.Serial(port=port, baudrate=baud, timeout=0.2, write_timeout=1.0)
-        except serial.SerialException as exc:
-            self._log(f"Bootloader open failed: {exc}")
-            self.after(0, lambda: self._finish_bootloader_connect(False, "", f"Open failed: {exc}"))
-            return
+        for attempt in range(1, max_retries + 1):
+            self._log(f"Opening bootloader connection (attempt {attempt}/{max_retries})...")
 
-        ok, version_or_error = self._bootloader_handshake(boot_ser)
-        if not ok:
-            self._log(f"Bootloader handshake failed: {version_or_error}")
+            try:
+                boot_ser = serial.Serial(port=port, baudrate=baud, timeout=0.2, write_timeout=1.0)
+            except serial.SerialException as exc:
+                last_error = f"Open failed: {exc}"
+                self._log(f"Bootloader open failed (attempt {attempt}/{max_retries}): {exc}")
+                if attempt < max_retries:
+                    self._log(f"Retrying bootloader connect in {retry_delay:.1f}s...")
+                    time.sleep(retry_delay)
+                continue
+
+            ok, version_or_error = self._bootloader_handshake(boot_ser, timeout_s=handshake_timeout)
+            if ok:
+                self.bootloader_serial = boot_ser
+                self._log(f"Bootloader connected: {version_or_error}")
+                self.after(0, lambda: self._finish_bootloader_connect(True, version_or_error, ""))
+                return
+
+            last_error = version_or_error
+            self._log(f"Bootloader handshake failed (attempt {attempt}/{max_retries}): {version_or_error}")
             try:
                 boot_ser.close()
             except Exception:
                 pass
-            self.after(0, lambda: self._finish_bootloader_connect(False, "", version_or_error))
-            return
 
-        self.bootloader_serial = boot_ser
-        self._log(f"Bootloader connected: {version_or_error}")
-        self.after(0, lambda: self._finish_bootloader_connect(True, version_or_error, ""))
+            if attempt < max_retries:
+                self._log(f"Retrying bootloader connect in {retry_delay:.1f}s...")
+                time.sleep(retry_delay)
+
+        self.after(0, lambda: self._finish_bootloader_connect(False, "", last_error))
 
     def _finish_bootloader_connect(self, connected: bool, version: str, error_text: str):
         self.boot_connect_btn.configure(state="normal")
@@ -1708,15 +1726,15 @@ class BridgeGui(ctk.CTk):
             self._log(f"Bootloader connect failed: {error_text}")
         self._refresh_statistics_display()
 
-    def _bootloader_handshake(self, boot_ser: serial.Serial):
-        success_deadline = None
+    def _bootloader_handshake(self, boot_ser: serial.Serial, timeout_s: float = 8.0):
+        deadline = time.time() + max(0.5, float(timeout_s))
         try:
             boot_ser.reset_input_buffer()
             boot_ser.reset_output_buffer()
         except Exception:
             pass
 
-        while True:
+        while time.time() < deadline:
             try:
                 boot_ser.write(self.commands["bootloader"]["handshake"])
                 boot_ser.flush()
@@ -1729,17 +1747,13 @@ class BridgeGui(ctk.CTk):
 
             text = response.decode("ascii", errors="replace").strip()
             if "c45b2" not in text:
-                # Start timeout only after first response received
-                if success_deadline is None:
-                    success_deadline = time.time() + 8.0
-                # Check if we've exceeded timeout waiting for success
-                if time.time() > success_deadline:
-                    return False, "Timeout waiting for bootloader identifier"
                 continue
 
             token = text.split("c45b2", maxsplit=1)[1].strip()
             version = token if token else "unknown"
             return True, version
+
+        return False, f"Timeout waiting for bootloader identifier ({timeout_s:.1f}s)"
 
     def _flash_firmware(self):
         self._start_flash("firmware")
