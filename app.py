@@ -1461,12 +1461,20 @@ class BridgeGui(ctk.CTk):
                                     # Keep waiting for SUCCESS/ERR while ignoring unrelated lines.
                                     self._log(f"DEBUG set_ack ignore: '{msg}'")
                                     pass
+                                elif response_key == "set_rsp" and not self._is_set_ack_response(msg):
+                                    # For parameter echo: ignore messages that aren't valid SET responses
+                                    self._log(f"DEBUG set_rsp ignore (not valid response): '{msg}'")
+                                    pass
                                 elif response_key == "set_rsp":
                                     self._log(
                                         f"DEBUG await accept(set_rsp): msg='{msg}', event_id={id(response_event)}"
                                     )
                                     self.awaiting_response_value = msg
                                     response_event.set()
+                                elif response_key == "set_resp" and not self._is_set_ack_response(msg):
+                                    # For SET command responses: ignore messages that aren't valid SET responses
+                                    self._log(f"DEBUG set_resp ignore (not valid response): '{msg}'")
+                                    pass
                                 elif response_key == "set_resp":
                                     self._log(
                                         f"DEBUG await accept(set_resp): msg='{msg}', event_id={id(response_event)}"
