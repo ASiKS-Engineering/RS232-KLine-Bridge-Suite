@@ -92,6 +92,7 @@ class BridgeGui(ctk.CTk):
             (self.commands["bridge_get"]["klinetx"], "klinetx"),
             (self.commands["bridge_get"]["klinebr"], "klinebr"),
             (self.commands["bridge_get"]["dtr_fwd"], "dtr_fwd"),
+            (self.commands["bridge_get"]["bbm"], "bbm"),
         ]
         self.get_command_timeouts = {
             self.commands["bridge_get"]["version"]: 1.2,
@@ -108,6 +109,7 @@ class BridgeGui(ctk.CTk):
             self.commands["bridge_get"]["klinetx"]: 1.7,
             self.commands["bridge_get"]["klinebr"]: 1.7,
             self.commands["bridge_get"]["dtr_fwd"]: 1.7,
+            self.commands["bridge_get"]["bbm"]: 1.7,
         }
         self.bridge_stats_values = {key: "-" for _, key in self.bridge_stat_request_commands}
         self.bridge_stat_bit_width = {
@@ -138,6 +140,9 @@ class BridgeGui(ctk.CTk):
         self.processing_animator_id = None
         self.log_boxes = {}
         self.version_timeout_after_id = None
+        self.bridge_max_buffer_size = None
+        self.buffer_fill_progress = None
+        self.buffer_fill_status_label = None
 
         self._load_app_config()
 
@@ -201,10 +206,11 @@ class BridgeGui(ctk.CTk):
                 "klinetx": "-get ktx",
                 "klinebr": "-get kbr",
                 "dtr_fwd": "-get fwd",
+                "bbm": "-get bbm",
                 "bridgem": "-get brm",
             },
             "bridge_set": {
-                "reset": "-set rsb",
+                "reset": "-set rsb 1",
                 "savecfg": "-set scg",
                 "kline_high": "-set ksh",
                 "kline_low": "-set ksl",
@@ -401,7 +407,7 @@ class BridgeGui(ctk.CTk):
             command=lambda: self._send_bridge_command(self.commands["bridge_set"]["reset"]),
         )
         self.reset_bridge_btn.grid(row=0, column=8, padx=(8, 6), pady=10)
-        self._install_tooltip(self.reset_bridge_btn, "Bridge per -set rsb zuruecksetzen")
+        self._install_tooltip(self.reset_bridge_btn, "Bridge per -set rsb 1 zuruecksetzen")
 
         self.processing_label = ctk.CTkLabel(header, text="", font=ctk.CTkFont(size=16, weight="bold"), text_color=("#2f81f7", "#2f81f7"), width=20)
         self.processing_label.grid(row=0, column=9, padx=(12, 12), pady=10)
@@ -665,6 +671,20 @@ class BridgeGui(ctk.CTk):
             control.configure(command=lambda _v=None, c=cmd: self._on_param_control_changed(c))
             control.bind("<Return>", lambda _e, c=cmd: self._on_param_enter_pressed(c))
 
+        ctk.CTkLabel(settings_frame, text="Buffer Fill Level", font=ctk.CTkFont(weight="bold")).grid(
+            row=5, column=0, padx=(12, 6), pady=(12, 10), sticky="w"
+        )
+        self.buffer_fill_progress = ctk.CTkProgressBar(settings_frame, height=14)
+        self.buffer_fill_progress.grid(row=5, column=1, columnspan=3, padx=(0, 10), pady=(12, 10), sticky="ew")
+        self.buffer_fill_progress.set(0)
+        self.buffer_fill_status_label = ctk.CTkLabel(
+            settings_frame,
+            text="Used: 0 B / Max: -",
+            font=ctk.CTkFont(family="Consolas", size=12),
+            text_color=("#4b5563", "#9ca3af"),
+        )
+        self.buffer_fill_status_label.grid(row=5, column=4, columnspan=2, padx=(0, 12), pady=(12, 10), sticky="e")
+
         self.log_box = ctk.CTkTextbox(bridge_tab, wrap="word", corner_radius=12, border_width=1, border_color=self.CARD_BORDER)
         self.log_box.grid(row=2, column=0, sticky="nsew", pady=(0, 8))
         self.log_box.configure(font=ctk.CTkFont(family="Consolas", size=12))
@@ -733,6 +753,7 @@ class BridgeGui(ctk.CTk):
         self._configure_log_tags()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self._refresh_statistics_display()
+        self._update_buffer_fill_indicator()
 
     def _watch_active_tab(self):
         try:
@@ -980,8 +1001,63 @@ class BridgeGui(ctk.CTk):
                 self.param_entries[self.commands["bridge_set"]["klinebr"]]["widget"].set(str(numeric))
             elif key == "dtr_fwd" and numeric is not None:
                 self.param_entries[self.commands["bridge_set"]["dtr_fwd"]]["widget"].set("1 (ein)" if numeric else "0 (aus)")
+            elif key == "bbm" and numeric is not None:
+                self.bridge_max_buffer_size = numeric
         finally:
             self.suspend_param_autosend = False
+            self._update_buffer_fill_indicator()
+
+    def _current_buffer_sum(self) -> int:
+        total = 0
+        buffer_commands = [
+            self.commands["bridge_set"]["rs232rx"],
+            self.commands["bridge_set"]["rs232tx"],
+            self.commands["bridge_set"]["klinerx"],
+            self.commands["bridge_set"]["klinetx"],
+        ]
+        for command in buffer_commands:
+            entry = self.param_entries.get(command)
+            if not entry:
+                continue
+            raw = entry["widget"].get().strip()
+            value = self._resolve_param_value(command, raw)
+            try:
+                total += int(value, 10)
+            except Exception:
+                continue
+        return total
+
+    def _update_buffer_fill_indicator(self):
+        if self.buffer_fill_progress is None or self.buffer_fill_status_label is None:
+            return
+
+        used = self._current_buffer_sum()
+        max_value = self.bridge_max_buffer_size if isinstance(self.bridge_max_buffer_size, int) else None
+        if max_value is None or max_value <= 0:
+            self.buffer_fill_progress.set(0)
+            self.buffer_fill_progress.configure(progress_color=("#9ca3af", "#6b7280"))
+            self.buffer_fill_status_label.configure(
+                text=f"Used: {used} B / Max: - (read with upload)",
+                text_color=("#4b5563", "#9ca3af"),
+            )
+            return
+
+        ratio = used / max_value
+        clamped = max(0.0, min(1.0, ratio))
+        if ratio < 0.7:
+            color = ("#15803d", "#22c55e")
+        elif ratio < 0.9:
+            color = ("#b45309", "#f59e0b")
+        else:
+            color = ("#b91c1c", "#ef4444")
+
+        self.buffer_fill_progress.set(clamped)
+        self.buffer_fill_progress.configure(progress_color=color)
+        percent = int(round(ratio * 100))
+        self.buffer_fill_status_label.configure(
+            text=f"Used: {used} B / Max: {max_value} B ({percent}%)",
+            text_color=color,
+        )
 
     def _upload_bridge_config_worker(self):
         self._set_processing(True)
@@ -1502,9 +1578,12 @@ class BridgeGui(ctk.CTk):
             self.selected_rs232_baud = self._normalize_baud_value(value, self.DEFAULT_RS232_BAUD)
             self._save_app_config()
 
+        self._update_buffer_fill_indicator()
+
     def _on_param_control_changed(self, command: str):
         if self.suspend_param_autosend:
             return
+        self._update_buffer_fill_indicator()
         pending_job = self.param_autosend_jobs.pop(command, None)
         if pending_job:
             try:
@@ -1532,6 +1611,7 @@ class BridgeGui(ctk.CTk):
             except Exception:
                 pass
         self._send_param(command, show_warnings=True)
+        self._update_buffer_fill_indicator()
         return "break"
 
     def _resolve_param_value(self, command: str, raw_value: str) -> str:
