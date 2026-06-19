@@ -1461,6 +1461,12 @@ class BridgeGui(ctk.CTk):
                                     # Keep waiting for SUCCESS/ERR while ignoring unrelated lines.
                                     self._log(f"DEBUG set_ack ignore: '{msg}'")
                                     pass
+                                elif response_key == "set_rsp":
+                                    self._log(
+                                        f"DEBUG await accept(set_rsp): msg='{msg}', event_id={id(response_event)}"
+                                    )
+                                    self.awaiting_response_value = msg
+                                    response_event.set()
                                 elif response_key == "reset_ack" and not self._is_reset_ack_response(msg):
                                     # Reset path waits explicitly for SUCCESS or ERR.
                                     pass
@@ -1695,15 +1701,28 @@ class BridgeGui(ctk.CTk):
                 return
 
         cmd = f"{command} {value}"
-        self._log(f"DEBUG param direct-set start: cmd='{cmd}'")
-        if not self._write_serial_line(cmd):
+        self._log(f"DEBUG param set->rsp->readback start: cmd='{cmd}'")
+        set_ok, set_response = self._query_bridge_value(cmd, "set_rsp", timeout=2.0)
+        if not set_ok:
             self.suspend_param_autosend = True
             try:
                 control.set(previous_display)
             finally:
                 self.suspend_param_autosend = False
             if show_warnings:
-                messagebox.showwarning("Bridge", f"Senden fehlgeschlagen fuer {cmd}.")
+                messagebox.showwarning("Bridge", f"Keine Antwort fuer {cmd}: {set_response}")
+            self._update_buffer_fill_indicator()
+            return
+
+        self._log(f"DEBUG param set response: cmd='{cmd}', response='{set_response}'")
+        if self._is_set_error_response(set_response):
+            self.suspend_param_autosend = True
+            try:
+                control.set(previous_display)
+            finally:
+                self.suspend_param_autosend = False
+            if show_warnings:
+                messagebox.showwarning("Bridge ERR", f"Bridge hat den Wert abgelehnt: {set_response}")
             self._update_buffer_fill_indicator()
             return
 
@@ -1723,7 +1742,7 @@ class BridgeGui(ctk.CTk):
             time.sleep(self.PARAM_SET_READBACK_DELAY_S)
             ok, response = self._query_bridge_value(get_command, key, timeout=self._get_timeout_for_command(get_command))
             if ok:
-                self._log(f"DEBUG param direct-set readback: cmd='{cmd}', response='{response}'")
+                self._log(f"DEBUG param readback: cmd='{cmd}', response='{response}'")
                 self._apply_uploaded_config_value(key, response)
                 if command == self.commands["bridge_set"]["rs232br"]:
                     resolved = self._resolve_param_value(command, self.param_entries[command]["widget"].get().strip())
