@@ -204,7 +204,7 @@ class BridgeGui(ctk.CTk):
                 "bridgem": "-get brm",
             },
             "bridge_set": {
-                "reset": "-set rbr 1",
+                "reset": "-set rsb",
                 "savecfg": "-set scg",
                 "kline_high": "-set ksh",
                 "kline_low": "-set ksl",
@@ -401,7 +401,7 @@ class BridgeGui(ctk.CTk):
             command=lambda: self._send_bridge_command(self.commands["bridge_set"]["reset"]),
         )
         self.reset_bridge_btn.grid(row=0, column=8, padx=(8, 6), pady=10)
-        self._install_tooltip(self.reset_bridge_btn, "Bridge per -set resetbr zuruecksetzen")
+        self._install_tooltip(self.reset_bridge_btn, "Bridge per -set rsb zuruecksetzen")
 
         self.processing_label = ctk.CTkLabel(header, text="", font=ctk.CTkFont(size=16, weight="bold"), text_color=("#2f81f7", "#2f81f7"), width=20)
         self.processing_label.grid(row=0, column=9, padx=(12, 12), pady=10)
@@ -2018,6 +2018,5 @@ class BridgeGui(ctk.CTk):
 if __name__ == "__main__":
     app = BridgeGui()
     app.mainloop()
-
 
 
