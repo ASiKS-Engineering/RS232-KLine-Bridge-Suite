@@ -7,6 +7,7 @@ import subprocess
 from datetime import datetime
 from tkinter import BooleanVar, Menu, filedialog, messagebox
 
+import sys
 import customtkinter as ctk
 import serial
 import serial.tools.list_ports
@@ -68,6 +69,8 @@ class BridgeGui(ctk.CTk):
         self.terminal_mode_values = ["String", "Character", "Bytes (Hex)"]
         self.config_path = os.path.join(os.path.dirname(__file__), "app_config.json")
         self.selected_ui_mode = "Automatisch"
+        self.log_file_path = os.path.join(os.path.dirname(__file__), "debug_log.txt")
+        self._init_log_file()
         self.selected_port_baud = self.DEFAULT_PORT_BAUD
         self.selected_rs232_baud = self.DEFAULT_RS232_BAUD
         self.build_info = self._detect_build_info()
@@ -188,6 +191,9 @@ class BridgeGui(ctk.CTk):
         help_menu = Menu(menubar, tearoff=0)
         help_menu.add_command(label="Ueber", command=self._show_about)
         menubar.add_cascade(label="Hilfe", menu=help_menu)
+
+        help_menu.add_separator()
+        help_menu.add_command(label="Debug-Log oeffnen", command=self._open_log_file)
 
         self.configure(menu=menubar)
 
@@ -816,6 +822,38 @@ class BridgeGui(ctk.CTk):
         if tab_name == "Terminal":
             self._disable_dtr_for_terminal()
 
+    def _init_log_file(self):
+        """Initialize the debug log file with timestamp."""
+        try:
+            with open(self.log_file_path, "a", encoding="utf-8") as f:
+                f.write(f"\n{'='*80}\n")
+                f.write(f"Log started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"App Version: {self.APP_VERSION}\n")
+                f.write(f"{'='*80}\n")
+        except Exception as e:
+            print(f"Failed to initialize log file: {e}")
+
+    def _write_to_log_file(self, entry: str):
+        """Write a single log entry to the debug log file."""
+        try:
+            with open(self.log_file_path, "a", encoding="utf-8") as f:
+                f.write(entry)
+        except Exception as e:
+            print(f"Failed to write to log file: {e}")
+
+    def _open_log_file(self):
+        """Open the debug log file in the default text editor."""
+        try:
+            if not os.path.exists(self.log_file_path):
+                messagebox.showinfo("Log File", f"Log file not found at:\n{self.log_file_path}")
+                return
+            if os.name == "nt":  # Windows
+                os.startfile(self.log_file_path)
+            else:  # Linux/Mac
+                subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", self.log_file_path])
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to open log file: {e}")
+
     def _disable_dtr_for_terminal(self):
         if not self.serial_port or not self.serial_port.is_open:
             return
@@ -838,7 +876,9 @@ class BridgeGui(ctk.CTk):
         elif "warn" in lowered or "ungueltig" in lowered:
             self.warn_count += 1
 
-        self.log_queue.put((self.active_tab_name, f"[{ts}] {text}\n"))
+        log_entry = f"[{ts}] {text}\n"
+        self.log_queue.put((self.active_tab_name, log_entry))
+        self._write_to_log_file(log_entry)
         self.after(0, self._refresh_statistics_display)
 
     def _configure_log_tags(self):
