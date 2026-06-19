@@ -686,6 +686,7 @@ class BridgeGui(ctk.CTk):
 
             control.grid(row=row, column=control_col, padx=control_padx, pady=pady, sticky="ew")
             self.param_entries[cmd] = {"widget": control, "type": control_type}
+            self.param_confirmed_values[cmd] = control.get().strip()
             control.configure(command=lambda _v=None, c=cmd: self._on_param_control_changed(c))
             control.bind("<Return>", lambda _e, c=cmd: self._on_param_enter_pressed(c))
 
@@ -1647,6 +1648,29 @@ class BridgeGui(ctk.CTk):
                 self.suspend_param_autosend = False
             self._update_buffer_fill_indicator()
             return
+
+        # Read back the confirmed value after SUCCESS so UI always reflects device state.
+        set_to_get = {
+            self.commands["bridge_set"]["rs232rx"]: (self.commands["bridge_get"]["rs232rx"], "rs232rx"),
+            self.commands["bridge_set"]["rs232tx"]: (self.commands["bridge_get"]["rs232tx"], "rs232tx"),
+            self.commands["bridge_set"]["rs232br"]: (self.commands["bridge_get"]["rs232br"], "rs232br"),
+            self.commands["bridge_set"]["klinerx"]: (self.commands["bridge_get"]["klinerx"], "klinerx"),
+            self.commands["bridge_set"]["klinetx"]: (self.commands["bridge_get"]["klinetx"], "klinetx"),
+            self.commands["bridge_set"]["klinebr"]: (self.commands["bridge_get"]["klinebr"], "klinebr"),
+            self.commands["bridge_set"]["dtr_fwd"]: (self.commands["bridge_get"]["dtr_fwd"], "dtr_fwd"),
+        }
+        readback = set_to_get.get(command)
+        if readback is not None:
+            get_command, key = readback
+            ok, response = self._query_bridge_value(get_command, key, timeout=self._get_timeout_for_command(get_command))
+            if ok:
+                self._apply_uploaded_config_value(key, response)
+                if command == self.commands["bridge_set"]["rs232br"]:
+                    resolved = self._resolve_param_value(command, self.param_entries[command]["widget"].get().strip())
+                    self.selected_rs232_baud = self._normalize_baud_value(resolved, self.DEFAULT_RS232_BAUD)
+                    self._save_app_config()
+                return
+            self._log(f"WARN: Readback failed for {command}: {response}")
 
         confirmed_display = raw_value
         if command in {
