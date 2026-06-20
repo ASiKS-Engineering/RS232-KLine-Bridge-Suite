@@ -765,7 +765,7 @@ class BridgeGui(ctk.CTk):
         self.boot_connect_btn = ctk.CTkButton(
             boot_frame,
             text="Connect to Bootloader",
-            width=180,
+            width=200,
             command=self._connect_to_bootloader,
         )
         self.boot_connect_btn.grid(row=1, column=0, padx=(10, 8), pady=6, sticky="ns")
@@ -773,27 +773,27 @@ class BridgeGui(ctk.CTk):
 
         self.fw_path_entry = ctk.CTkEntry(boot_frame)
         self.fw_path_entry.grid(row=2, column=1, padx=8, pady=6, sticky="ew")
-        self.pick_firmware_btn = ctk.CTkButton(boot_frame, text="Firmware...", width=120, command=self._pick_firmware)
+        self.pick_firmware_btn = ctk.CTkButton(boot_frame, text="Firmware...", width=200, command=self._pick_firmware)
         self.pick_firmware_btn.grid(
             row=2, column=2, padx=(8, 10), pady=6
         )
         self._install_tooltip(self.pick_firmware_btn, "Firmware-Datei auswaehlen")
-        self.flash_firmware_btn = ctk.CTkButton(boot_frame, text="Flash Firmware", width=140, command=self._flash_firmware)
+        self.flash_firmware_btn = ctk.CTkButton(boot_frame, text="Flash Firmware", width=200, command=self._flash_firmware)
         self.flash_firmware_btn.grid(row=2, column=0, padx=(10, 8), pady=6)
         self._install_tooltip(self.flash_firmware_btn, "Firmware in den Controller flashen")
 
         self.eeprom_path_entry = ctk.CTkEntry(boot_frame)
         self.eeprom_path_entry.grid(row=3, column=1, padx=8, pady=6, sticky="ew")
-        self.pick_eeprom_btn = ctk.CTkButton(boot_frame, text="EEPROM...", width=120, command=self._pick_eeprom)
+        self.pick_eeprom_btn = ctk.CTkButton(boot_frame, text="EEPROM...", width=200, command=self._pick_eeprom)
         self.pick_eeprom_btn.grid(
             row=3, column=2, padx=(8, 10), pady=6
         )
         self._install_tooltip(self.pick_eeprom_btn, "EEPROM-Datei auswaehlen")
-        self.flash_eeprom_btn = ctk.CTkButton(boot_frame, text="Flash EEPROM", width=140, command=self._flash_eeprom)
+        self.flash_eeprom_btn = ctk.CTkButton(boot_frame, text="Flash EEPROM", width=200, command=self._flash_eeprom)
         self.flash_eeprom_btn.grid(row=3, column=0, padx=(10, 8), pady=6)
         self._install_tooltip(self.flash_eeprom_btn, "EEPROM-Inhalt flashen")
 
-        self.boot_start_app_btn = ctk.CTkButton(boot_frame, text="Start Application", width=140, command=self._bootloader_start_application)
+        self.boot_start_app_btn = ctk.CTkButton(boot_frame, text="Start Application", width=200, command=self._bootloader_start_application)
         self.boot_start_app_btn.grid(row=4, column=0, padx=(10, 8), pady=(6, 6))
         self._install_tooltip(self.boot_start_app_btn, "Bootloader verlassen und Applikation starten")
 
@@ -1639,11 +1639,14 @@ class BridgeGui(ctk.CTk):
         self.version_request_on_connect = False
         self._log("Version request timeout.")
         if on_connect:
-            self.after(0, lambda: messagebox.showwarning(
-                "Kein Geraet erkannt",
-                f"Keine Antwort vom Geraet erhalten.\n"
-                f"Moegliche Ursachen: Geraet nicht verbunden, falsche Baudrate oder falscher Port.",
-            ))
+            self.after(0, lambda: [
+                messagebox.showwarning(
+                    "Kein Geraet erkannt",
+                    "Keine Antwort vom Geraet erhalten.\n"
+                    "Moegliche Ursachen: Geraet nicht verbunden, falsche Baudrate oder falscher Port.",
+                ),
+                self._disconnect_serial(),
+            ])
 
     def _cancel_version_request(self):
         if self.version_timeout_after_id is not None:
@@ -1661,13 +1664,16 @@ class BridgeGui(ctk.CTk):
         if self.version_request_on_connect:
             self.version_request_on_connect = False
             if self.BRIDGE_DEVICE_ID not in version:
-                self.after(0, lambda v=version: messagebox.showwarning(
-                    "Geraet nicht erkannt",
-                    f"Die Geraeteantwort entspricht nicht dem erwarteten Bridge-Geraet.\n\n"
-                    f"Erwartet: '...{self.BRIDGE_DEVICE_ID}...'\n"
-                    f"Erhalten:  '{v}'\n\n"
-                    f"Bitte Port und Baudrate pruefen.",
-                ))
+                self.after(0, lambda v=version: [
+                    messagebox.showwarning(
+                        "Geraet nicht erkannt",
+                        f"Die Geraeteantwort entspricht nicht dem erwarteten Bridge-Geraet.\n\n"
+                        f"Erwartet: '...{self.BRIDGE_DEVICE_ID}...'\n"
+                        f"Erhalten:  '{v}'\n\n"
+                        f"Bitte Port und Baudrate pruefen.",
+                    ),
+                    self._disconnect_serial(),
+                ])
         self._refresh_statistics_display()
 
     def _normalize_ack_text(self, message: str) -> str:
