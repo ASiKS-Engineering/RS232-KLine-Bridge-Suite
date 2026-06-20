@@ -1060,22 +1060,28 @@ class BridgeGui(ctk.CTk):
             return None
         # Remove hidden control chars from serial payloads (e.g. NUL, STX) before parsing.
         cleaned = "".join(ch for ch in str(text) if ch >= " " or ch == "\t")
+        original_cleaned = cleaned
         cleaned = cleaned.strip().replace(",", " ").replace(";", " ")
 
         hex_match = re.search(r"(?i)(?:^|\s)([+-]?0x[0-9a-f]+)(?:$|\s)", cleaned)
         if hex_match:
             try:
-                return int(hex_match.group(1), 16)
+                val = int(hex_match.group(1), 16)
+                self._log(f"DEBUG extract_numeric: text={repr(text)}, cleaned={repr(cleaned)}, hex_match={hex_match.group(1)}, result={val}")
+                return val
             except ValueError:
                 pass
 
         dec_match = re.search(r"(?:^|\s)([+-]?\d+)(?:$|\s)", cleaned)
         if dec_match:
             try:
-                return int(dec_match.group(1), 10)
+                val = int(dec_match.group(1), 10)
+                self._log(f"DEBUG extract_numeric: text={repr(text)}, cleaned={repr(cleaned)}, dec_match={dec_match.group(1)}, result={val}")
+                return val
             except ValueError:
                 pass
 
+        self._log(f"DEBUG extract_numeric: text={repr(text)}, cleaned={repr(cleaned)}, NO_MATCH")
         return None
 
     def _normalize_bridge_stat_value(self, key: str, raw_value: str) -> str:
@@ -1505,6 +1511,7 @@ class BridgeGui(ctk.CTk):
                         response_event = self.awaiting_response_event
                         if response_key is not None and response_event is not None and not response_event.is_set():
                             if msg:
+                                self._log(f"DEBUG reader check: key='{response_key}', msg='{msg}', is_set={response_event.is_set()}")
                                 if response_key == "set_ack" and not self._is_set_ack_response(msg):
                                     # Keep waiting for SUCCESS/ERR while ignoring unrelated lines.
                                     self._log(f"DEBUG set_ack ignore: '{msg}'")
@@ -1676,7 +1683,11 @@ class BridgeGui(ctk.CTk):
 
     def _is_set_response_message(self, message: str) -> bool:
         """Valid response for -set flows: ACK/ERR tokens or numeric echoes."""
-        return self._is_set_ack_response(message) or self._is_set_value_echo_response(message)
+        is_ack = self._is_set_ack_response(message)
+        is_echo = self._is_set_value_echo_response(message)
+        result = is_ack or is_echo
+        self._log(f"DEBUG _is_set_response: msg={repr(message)}, is_ack={is_ack}, is_echo={is_echo}, result={result}")
+        return result
 
     def _describe_set_response_match(self, message: str) -> str:
         """Return why a message was (not) classified as a set response for debugging."""
@@ -1689,6 +1700,13 @@ class BridgeGui(ctk.CTk):
             return f"value-echo({numeric})"
         normalized = self._normalize_ack_text(message)
         return f"no-match normalized='{normalized}'"
+
+    def _get_command_key(self, command: str, group: str = "bridge_set") -> str | None:
+        """Return the registry key for a command string, e.g. '-set krx' -> 'klinerx'."""
+        for key, cmd_str in self.commands.get(group, {}).items():
+            if cmd_str == command:
+                return key
+        return None
 
     def _is_reset_ack_response(self, message: str) -> bool:
         return self._is_set_success_response(message) or self._is_set_error_response(message)
@@ -1809,11 +1827,7 @@ class BridgeGui(ctk.CTk):
             return
 
         # Device echoes back the value. Determine parameter key from command for UI update.
-        param_key = None
-        for key, cmd_str in self.commands["bridge_set"].items():
-            if cmd_str == command:
-                param_key = key
-                break
+        param_key = self._get_command_key(command)
         
         if param_key is not None:
             self._log(f"DEBUG param echoed value: cmd='{cmd}', param_key='{param_key}', echo='{set_response}'")
