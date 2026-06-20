@@ -37,6 +37,19 @@ class BridgeGui(ctk.CTk):
     BOOT_HANDSHAKE_TIMEOUT_S = 8.0
     BRIDGE_DEVICE_ID = "RS232-KLine-Bridge"
 
+    def _get_runtime_data_dir(self) -> str:
+        # In PyInstaller one-file mode, __file__ points to a temporary extraction dir.
+        # Store config/logs in a stable per-user folder instead.
+        if getattr(sys, "frozen", False):
+            local_app_data = os.getenv("LOCALAPPDATA")
+            if local_app_data:
+                base_dir = os.path.join(local_app_data, "RS232-KLine Bridge Suite")
+            else:
+                base_dir = os.path.dirname(sys.executable)
+            os.makedirs(base_dir, exist_ok=True)
+            return base_dir
+        return os.path.dirname(os.path.abspath(__file__))
+
     def __init__(self):
         super().__init__()
         self.title("RS232-KLine Bridge Suite")
@@ -72,9 +85,10 @@ class BridgeGui(ctk.CTk):
         self.bridge_stats_labels = {}
         self.ui_mode_map = {"Light": "Light", "Dark": "Dark", "Automatic": "System"}
         self.terminal_mode_values = ["String", "Character", "Bytes (Hex)"]
-        self.config_path = os.path.join(os.path.dirname(__file__), "app_config.json")
+        self.runtime_data_dir = self._get_runtime_data_dir()
+        self.config_path = os.path.join(self.runtime_data_dir, "app_config.json")
         self.selected_ui_mode = "Automatic"
-        self.log_file_path = os.path.join(os.path.dirname(__file__), "debug_log.txt")
+        self.log_file_path = os.path.join(self.runtime_data_dir, "debug_log.txt")
         self._init_log_file()
         self.selected_port_baud = self.DEFAULT_PORT_BAUD
         self.selected_rs232_baud = self.DEFAULT_RS232_BAUD
@@ -249,6 +263,7 @@ class BridgeGui(ctk.CTk):
             "bridge_set": {
                 "reset": "-set rsb 1",
                 "savecfg": "-set scg",
+                "resetst": "-set rst",
                 "kline_high": "-set ksh",
                 "kline_low": "-set ksl",
                 "kline_pulse_prefix": "-set ksp",
@@ -522,7 +537,7 @@ class BridgeGui(ctk.CTk):
             command=self._reset_runtime_statistics,
         )
         self.stats_reset_btn.grid(row=0, column=1, padx=0, pady=0, sticky="e")
-        self._install_tooltip(self.stats_reset_btn, "Clear runtime statistics values")
+        self._install_tooltip(self.stats_reset_btn, "Clear runtime and bridge statistics values")
 
         bridge_stats_details = ctk.CTkFrame(bridge_stats_frame, fg_color="transparent")
         bridge_stats_details.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 10))
@@ -998,6 +1013,26 @@ class BridgeGui(ctk.CTk):
         self.app_start_time = time.time()
         self._refresh_statistics_display()
         self._log("Runtime statistics reset.")
+
+        if not self._can_send_bridge_commands(show_warnings=False):
+            self._log("Bridge statistics reset skipped (not connected or DTR inactive).")
+            return
+
+        command = f"{self.commands['bridge_set']['resetst']} 1"
+        self._log(f"DEBUG resetst start: cmd='{command}'")
+        set_ok, set_response = self._query_bridge_value(command, "set_rsp", timeout=2.0)
+        if not set_ok:
+            self._log(f"DEBUG resetst transport-fail: cmd='{command}', result='{set_response}'")
+            messagebox.showwarning("Bridge", f"No valid response for {command}: {set_response}")
+            return
+
+        self._log(f"DEBUG resetst response: cmd='{command}', response='{set_response}'")
+        if self._is_set_error_response(set_response):
+            self._log(f"Bridge statistics reset rejected: {command} -> {set_response}")
+            messagebox.showwarning("Bridge ERR", f"Bridge rejected statistics reset: {set_response}")
+            return
+
+        self._log(f"Bridge statistics reset acknowledged: {command} -> {set_response}")
 
     def _on_debug_logging_toggle(self):
         enabled = bool(self.debug_logging_var.get())
