@@ -1060,28 +1060,22 @@ class BridgeGui(ctk.CTk):
             return None
         # Remove hidden control chars from serial payloads (e.g. NUL, STX) before parsing.
         cleaned = "".join(ch for ch in str(text) if ch >= " " or ch == "\t")
-        original_cleaned = cleaned
         cleaned = cleaned.strip().replace(",", " ").replace(";", " ")
 
         hex_match = re.search(r"(?i)(?:^|\s)([+-]?0x[0-9a-f]+)(?:$|\s)", cleaned)
         if hex_match:
             try:
-                val = int(hex_match.group(1), 16)
-                self._log(f"DEBUG extract_numeric: text={repr(text)}, cleaned={repr(cleaned)}, hex_match={hex_match.group(1)}, result={val}")
-                return val
+                return int(hex_match.group(1), 16)
             except ValueError:
                 pass
 
         dec_match = re.search(r"(?:^|\s)([+-]?\d+)(?:$|\s)", cleaned)
         if dec_match:
             try:
-                val = int(dec_match.group(1), 10)
-                self._log(f"DEBUG extract_numeric: text={repr(text)}, cleaned={repr(cleaned)}, dec_match={dec_match.group(1)}, result={val}")
-                return val
+                return int(dec_match.group(1), 10)
             except ValueError:
                 pass
 
-        self._log(f"DEBUG extract_numeric: text={repr(text)}, cleaned={repr(cleaned)}, NO_MATCH")
         return None
 
     def _normalize_bridge_stat_value(self, key: str, raw_value: str) -> str:
@@ -1505,63 +1499,63 @@ class BridgeGui(ctk.CTk):
                         msg = data.decode("utf-8", errors="replace").rstrip()
                     except Exception:
                         msg = repr(data)
-                    self._log(f"RX: {msg}")
-                    # CRITICAL: Minimize time inside lock. Read state only, do processing outside.
+                    accepted_key = None
+                    accepted_event = None
+                    schedule_auto_refresh = False
+                    ignored_reason = ""
+
+                    # Handle awaited response first, before any logging that can block on GUI/file I/O.
                     with self.awaiting_response_lock:
                         response_key = self.awaiting_response_key
                         response_event = self.awaiting_response_event
-                        should_process = response_key is not None and response_event is not None and not response_event.is_set() and msg
-                    
-                    if should_process:
-                        self._log(f"DEBUG reader rx_check: key={repr(response_key)}, msg='{msg}'")
-                        # Now do all validation and logging OUTSIDE the lock
-                        if response_key == "set_ack" and not self._is_set_ack_response(msg):
-                            # Keep waiting for SUCCESS/ERR while ignoring unrelated lines.
-                            self._log(f"DEBUG set_ack ignore: '{msg}'")
-                            pass
-                        elif response_key == "set_rsp" and not self._is_set_response_message(msg):
-                            # For parameter echo: ignore messages that aren't valid SET responses
-                            self._log(
-                                f"DEBUG set_rsp ignore: raw='{msg}', reason={self._describe_set_response_match(msg)}"
-                            )
-                            pass
-                        elif response_key == "set_rsp":
-                            self._log(
-                                f"DEBUG await accept(set_rsp): msg='{msg}', event_id={id(response_event)}"
-                            )
-                            with self.awaiting_response_lock:
+                        can_process = bool(
+                            msg and response_key is not None and response_event is not None and not response_event.is_set()
+                        )
+
+                        if can_process:
+                            if response_key == "set_ack":
+                                if self._is_set_ack_response(msg):
+                                    self.awaiting_response_value = msg
+                                    accepted_key = response_key
+                                    accepted_event = response_event
+                                    schedule_auto_refresh = self._is_set_success_response(msg)
+                                else:
+                                    ignored_reason = "set_ack-not-ack"
+                            elif response_key in {"set_rsp", "set_resp"}:
+                                if self._is_set_response_message(msg):
+                                    self.awaiting_response_value = msg
+                                    accepted_key = response_key
+                                    accepted_event = response_event
+                                else:
+                                    ignored_reason = self._describe_set_response_match(msg)
+                            elif response_key == "reset_ack":
+                                if self._is_reset_ack_response(msg):
+                                    self.awaiting_response_value = msg
+                                    accepted_key = response_key
+                                    accepted_event = response_event
+                                else:
+                                    ignored_reason = "reset_ack-not-ack"
+                            else:
                                 self.awaiting_response_value = msg
-                        elif response_key == "set_resp" and not self._is_set_response_message(msg):
-                            # For SET command responses: ignore messages that aren't valid SET responses
-                            self._log(
-                                f"DEBUG set_resp ignore: raw='{msg}', reason={self._describe_set_response_match(msg)}"
-                            )
-                            pass
-                        elif response_key == "set_resp":
-                            self._log(
-                                f"DEBUG await accept(set_resp): msg='{msg}', event_id={id(response_event)}"
-                            )
-                            with self.awaiting_response_lock:
-                                self.awaiting_response_value = msg
-                        elif response_key == "reset_ack" and not self._is_reset_ack_response(msg):
-                            # Reset path waits explicitly for SUCCESS or ERR.
-                            pass
-                        else:
-                            self._log(
-                                f"DEBUG await accept: key='{response_key}', msg='{msg}', event_id={id(response_event)}"
-                            )
-                            with self.awaiting_response_lock:
-                                self.awaiting_response_value = msg
-                                # Stats update inside lock to be safe
                                 if response_key in self.bridge_stats_values:
                                     self.bridge_stats_values[response_key] = self._normalize_bridge_stat_value(response_key, msg)
-                            if response_key == "set_ack" and self._is_set_success_response(msg):
-                                self.after(0, self._schedule_param_auto_refresh)
-                            self._log(
-                                f"DEBUG await signaled: key='{response_key}', event_id={id(response_event)}"
-                            )
-                        # Set event AFTER all processing to avoid race
-                        response_event.set()
+                                accepted_key = response_key
+                                accepted_event = response_event
+
+                    if accepted_event is not None:
+                        accepted_event.set()
+
+                    self._log(f"RX: {msg}")
+                    if accepted_key is not None:
+                        self._log(f"DEBUG await accept({accepted_key}): msg='{msg}', event_id={id(accepted_event)}")
+                        if schedule_auto_refresh:
+                            self.after(0, self._schedule_param_auto_refresh)
+                    elif ignored_reason and response_key == "set_rsp":
+                        self._log(f"DEBUG set_rsp ignore: raw='{msg}', reason={ignored_reason}")
+                    elif ignored_reason and response_key == "set_resp":
+                        self._log(f"DEBUG set_resp ignore: raw='{msg}', reason={ignored_reason}")
+                    elif ignored_reason and response_key == "set_ack":
+                        self._log(f"DEBUG set_ack ignore: '{msg}'")
                     if self.awaiting_version_response and msg:
                         if self.version_timeout_after_id is not None:
                             try:
@@ -1644,7 +1638,7 @@ class BridgeGui(ctk.CTk):
 
     def _normalize_ack_text(self, message: str) -> str:
         raw = (message or "").strip().upper()
-        # Drop control chars that may prefix serial payloads (e.g. NUL before SUCCESS).
+        # Drop control chars that may prefix serial payloads.
         filtered = "".join(ch for ch in raw if ch >= " " or ch == "\t")
         return " ".join(filtered.split())
 
@@ -1656,13 +1650,7 @@ class BridgeGui(ctk.CTk):
         if not normalized:
             return False
         tokens = normalized.replace(":", " ").replace(";", " ").replace(",", " ").split()
-        if any(token in {"SUCCESS", "SUC", "OK", "ACK"} for token in tokens):
-            return True
-        if normalized.startswith("SUCCESS"):
-            return True
-        if normalized.startswith("SUC"):
-            return True
-        if normalized == "OK":
+        if any(token in {"ACK"} for token in tokens):
             return True
         if normalized == "ACK":
             return True
@@ -1689,11 +1677,7 @@ class BridgeGui(ctk.CTk):
 
     def _is_set_response_message(self, message: str) -> bool:
         """Valid response for -set flows: ACK/ERR tokens or numeric echoes."""
-        is_ack = self._is_set_ack_response(message)
-        is_echo = self._is_set_value_echo_response(message)
-        result = is_ack or is_echo
-        self._log(f"DEBUG _is_set_response: msg={repr(message)}, is_ack={is_ack}, is_echo={is_echo}, result={result}")
-        return result
+        return self._is_set_ack_response(message) or self._is_set_value_echo_response(message)
 
     def _describe_set_response_match(self, message: str) -> str:
         """Return why a message was (not) classified as a set response for debugging."""
