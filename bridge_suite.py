@@ -248,7 +248,7 @@ class BridgeGui(ctk.CTk):
             },
             "bridge_set": {
                 "reset": "-set rsb 1",
-                "savecfg": "-set scg",
+                "savecfg": "-set scg 1",
                 "kline_high": "-set ksh",
                 "kline_low": "-set ksl",
                 "kline_pulse_prefix": "-set ksp",
@@ -718,7 +718,7 @@ class BridgeGui(ctk.CTk):
             command=lambda: self._send_bridge_command(self.commands["bridge_set"]["savecfg"]),
         )
         self.save_cfg_btn.grid(row=0, column=1, padx=0, pady=0, sticky="e")
-        self._install_tooltip(self.save_cfg_btn, "Save parameters permanently (-set savecfg)")
+        self._install_tooltip(self.save_cfg_btn, "Save parameters permanently (-set scg 1)")
 
         self.param_entries = {}
         buffer_color_map = {
