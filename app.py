@@ -55,6 +55,8 @@ class BridgeGui(ctk.CTk):
         self.fwd_labels = ["0 (aus)", "1 (ein)"]
         self.bootloader_ready = False
         self.log_autoscroll_var = BooleanVar(value=True)
+        self.debug_logging_var = BooleanVar(value=True)
+        self.debug_logging_enabled = True
         self.bridge_fw_version = "-"
         self.awaiting_version_response = False
         self.app_start_time = time.time()
@@ -179,6 +181,11 @@ class BridgeGui(ctk.CTk):
         view_menu = Menu(menubar, tearoff=0)
         view_menu.add_command(label="Log leeren", command=self._clear_log)
         view_menu.add_checkbutton(label="Auto-Scroll Log", variable=self.log_autoscroll_var)
+        view_menu.add_checkbutton(
+            label="Debug-Ausgaben",
+            variable=self.debug_logging_var,
+            command=self._on_debug_logging_toggle,
+        )
         menubar.add_cascade(label="Ansicht", menu=view_menu)
 
         tools_menu = Menu(menubar, tearoff=0)
@@ -864,6 +871,9 @@ class BridgeGui(ctk.CTk):
         self._toggle_dtr()
 
     def _log(self, text: str):
+        if text.startswith("DEBUG") and not self.debug_logging_enabled:
+            return
+
         ts = datetime.now().strftime("%H:%M:%S")
         lowered = text.lower()
         if "tx:" in lowered:
@@ -930,6 +940,13 @@ class BridgeGui(ctk.CTk):
         self.app_start_time = time.time()
         self._refresh_statistics_display()
         self._log("Runtime statistics reset.")
+
+    def _on_debug_logging_toggle(self):
+        enabled = bool(self.debug_logging_var.get())
+        self.debug_logging_enabled = enabled
+        self._save_app_config()
+        state_text = "aktiv" if enabled else "inaktiv"
+        self._log(f"Debug-Ausgaben sind jetzt {state_text}.")
 
     def _refresh_statistics_display(self):
         uptime_s = int(max(0, time.time() - self.app_start_time))
@@ -1384,10 +1401,14 @@ class BridgeGui(ctk.CTk):
                 str(data.get("rs232_baud", self.DEFAULT_RS232_BAUD)),
                 self.DEFAULT_RS232_BAUD,
             )
+            self.debug_logging_enabled = bool(data.get("debug_logging", True))
+            self.debug_logging_var.set(self.debug_logging_enabled)
         except Exception:
             self.selected_ui_mode = "Automatisch"
             self.selected_port_baud = self.DEFAULT_PORT_BAUD
             self.selected_rs232_baud = self.DEFAULT_RS232_BAUD
+            self.debug_logging_enabled = True
+            self.debug_logging_var.set(True)
 
         ctk.set_appearance_mode(self.ui_mode_map[self.selected_ui_mode])
 
@@ -1396,6 +1417,7 @@ class BridgeGui(ctk.CTk):
             "ui_mode": self.selected_ui_mode,
             "port_baud": self.selected_port_baud,
             "rs232_baud": self.selected_rs232_baud,
+            "debug_logging": self.debug_logging_enabled,
         }
         try:
             with open(self.config_path, "w", encoding="utf-8") as fp:
