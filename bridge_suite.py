@@ -715,7 +715,10 @@ class BridgeGui(ctk.CTk):
             height=40,
             corner_radius=10,
             font=ctk.CTkFont(size=22, weight="bold"),
-            command=lambda: self._send_bridge_command(self.commands["bridge_set"]["savecfg"]),
+            command=lambda: self._send_set_command_with_response(
+                self.commands["bridge_set"]["savecfg"],
+                show_warnings=True,
+            ),
         )
         self.save_cfg_btn.grid(row=0, column=1, padx=0, pady=0, sticky="e")
         self._install_tooltip(self.save_cfg_btn, "Save parameters permanently (-set scg 1)")
