@@ -1506,57 +1506,62 @@ class BridgeGui(ctk.CTk):
                     except Exception:
                         msg = repr(data)
                     self._log(f"RX: {msg}")
+                    # CRITICAL: Minimize time inside lock. Read state only, do processing outside.
                     with self.awaiting_response_lock:
                         response_key = self.awaiting_response_key
                         response_event = self.awaiting_response_event
-                        self._log(f"DEBUG reader rx_check: key={repr(response_key)}, event={response_event is not None}, is_set={response_event.is_set() if response_event else 'N/A'}, msg='{msg}'")
-                        if response_key is not None and response_event is not None and not response_event.is_set():
-                            if msg:
-                                self._log(f"DEBUG reader check: key='{response_key}', msg='{msg}', is_set={response_event.is_set()}")
-                                if response_key == "set_ack" and not self._is_set_ack_response(msg):
-                                    # Keep waiting for SUCCESS/ERR while ignoring unrelated lines.
-                                    self._log(f"DEBUG set_ack ignore: '{msg}'")
-                                    pass
-                                elif response_key == "set_rsp" and not self._is_set_response_message(msg):
-                                    # For parameter echo: ignore messages that aren't valid SET responses
-                                    self._log(
-                                        f"DEBUG set_rsp ignore: raw='{msg}', reason={self._describe_set_response_match(msg)}"
-                                    )
-                                    pass
-                                elif response_key == "set_rsp":
-                                    self._log(
-                                        f"DEBUG await accept(set_rsp): msg='{msg}', event_id={id(response_event)}"
-                                    )
-                                    self.awaiting_response_value = msg
-                                    response_event.set()
-                                elif response_key == "set_resp" and not self._is_set_response_message(msg):
-                                    # For SET command responses: ignore messages that aren't valid SET responses
-                                    self._log(
-                                        f"DEBUG set_resp ignore: raw='{msg}', reason={self._describe_set_response_match(msg)}"
-                                    )
-                                    pass
-                                elif response_key == "set_resp":
-                                    self._log(
-                                        f"DEBUG await accept(set_resp): msg='{msg}', event_id={id(response_event)}"
-                                    )
-                                    self.awaiting_response_value = msg
-                                    response_event.set()
-                                elif response_key == "reset_ack" and not self._is_reset_ack_response(msg):
-                                    # Reset path waits explicitly for SUCCESS or ERR.
-                                    pass
-                                else:
-                                    self._log(
-                                        f"DEBUG await accept: key='{response_key}', msg='{msg}', event_id={id(response_event)}"
-                                    )
-                                    self.awaiting_response_value = msg
-                                    if response_key == "set_ack" and self._is_set_success_response(msg):
-                                        self.after(0, self._schedule_param_auto_refresh)
-                                    if response_key in self.bridge_stats_values:
-                                        self.bridge_stats_values[response_key] = self._normalize_bridge_stat_value(response_key, msg)
-                                    response_event.set()
-                                    self._log(
-                                        f"DEBUG await signaled: key='{response_key}', event_id={id(response_event)}"
-                                    )
+                        should_process = response_key is not None and response_event is not None and not response_event.is_set() and msg
+                    
+                    if should_process:
+                        self._log(f"DEBUG reader rx_check: key={repr(response_key)}, msg='{msg}'")
+                        # Now do all validation and logging OUTSIDE the lock
+                        if response_key == "set_ack" and not self._is_set_ack_response(msg):
+                            # Keep waiting for SUCCESS/ERR while ignoring unrelated lines.
+                            self._log(f"DEBUG set_ack ignore: '{msg}'")
+                            pass
+                        elif response_key == "set_rsp" and not self._is_set_response_message(msg):
+                            # For parameter echo: ignore messages that aren't valid SET responses
+                            self._log(
+                                f"DEBUG set_rsp ignore: raw='{msg}', reason={self._describe_set_response_match(msg)}"
+                            )
+                            pass
+                        elif response_key == "set_rsp":
+                            self._log(
+                                f"DEBUG await accept(set_rsp): msg='{msg}', event_id={id(response_event)}"
+                            )
+                            with self.awaiting_response_lock:
+                                self.awaiting_response_value = msg
+                        elif response_key == "set_resp" and not self._is_set_response_message(msg):
+                            # For SET command responses: ignore messages that aren't valid SET responses
+                            self._log(
+                                f"DEBUG set_resp ignore: raw='{msg}', reason={self._describe_set_response_match(msg)}"
+                            )
+                            pass
+                        elif response_key == "set_resp":
+                            self._log(
+                                f"DEBUG await accept(set_resp): msg='{msg}', event_id={id(response_event)}"
+                            )
+                            with self.awaiting_response_lock:
+                                self.awaiting_response_value = msg
+                        elif response_key == "reset_ack" and not self._is_reset_ack_response(msg):
+                            # Reset path waits explicitly for SUCCESS or ERR.
+                            pass
+                        else:
+                            self._log(
+                                f"DEBUG await accept: key='{response_key}', msg='{msg}', event_id={id(response_event)}"
+                            )
+                            with self.awaiting_response_lock:
+                                self.awaiting_response_value = msg
+                                # Stats update inside lock to be safe
+                                if response_key in self.bridge_stats_values:
+                                    self.bridge_stats_values[response_key] = self._normalize_bridge_stat_value(response_key, msg)
+                            if response_key == "set_ack" and self._is_set_success_response(msg):
+                                self.after(0, self._schedule_param_auto_refresh)
+                            self._log(
+                                f"DEBUG await signaled: key='{response_key}', event_id={id(response_event)}"
+                            )
+                        # Set event AFTER all processing to avoid race
+                        response_event.set()
                     if self.awaiting_version_response and msg:
                         if self.version_timeout_after_id is not None:
                             try:
