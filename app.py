@@ -90,8 +90,12 @@ class BridgeGui(ctk.CTk):
             (self.commands["bridge_get"]["rs232ts"], "rts"),
             (self.commands["bridge_get"]["kliners"], "krs"),
             (self.commands["bridge_get"]["klinets"], "kts"),
-            (self.commands["bridge_get"]["rs232re"], "rre"),
-            (self.commands["bridge_get"]["klinere"], "kre"),
+            (self.commands["bridge_get"]["rs232fe"], "rfe"),
+            (self.commands["bridge_get"]["rs232oe"], "roe"),
+            (self.commands["bridge_get"]["rs232pe"], "rpe"),
+            (self.commands["bridge_get"]["klinefe"], "kfe"),
+            (self.commands["bridge_get"]["klineoe"], "koe"),
+            (self.commands["bridge_get"]["klinepe"], "kpe"),
         ]
         self.config_upload_commands = [
             (self.commands["bridge_get"]["rs232rx"], "rs232rx"),
@@ -109,8 +113,12 @@ class BridgeGui(ctk.CTk):
             self.commands["bridge_get"]["rs232ts"]: 0.03,
             self.commands["bridge_get"]["kliners"]: 0.03,
             self.commands["bridge_get"]["klinets"]: 0.03,
-            self.commands["bridge_get"]["rs232re"]: 0.03,
-            self.commands["bridge_get"]["klinere"]: 0.03,
+            self.commands["bridge_get"]["rs232fe"]: 0.03,
+            self.commands["bridge_get"]["rs232oe"]: 0.03,
+            self.commands["bridge_get"]["rs232pe"]: 0.03,
+            self.commands["bridge_get"]["klinefe"]: 0.03,
+            self.commands["bridge_get"]["klineoe"]: 0.03,
+            self.commands["bridge_get"]["klinepe"]: 0.03,
             self.commands["bridge_get"]["rs232rx"]: 0.05,
             self.commands["bridge_get"]["rs232tx"]: 0.05,
             self.commands["bridge_get"]["rs232br"]: 0.05,
@@ -121,10 +129,7 @@ class BridgeGui(ctk.CTk):
             self.commands["bridge_get"]["buffmax"]: 0.05,
         }
         self.bridge_stats_values = {key: "-" for _, key in self.bridge_stat_request_commands}
-        self.bridge_stat_bit_width = {
-            "rre": 8,
-            "kre": 8,
-        }
+        self.bridge_stat_bit_width = {}
         self.uart_error_flags = [
             (0x01, "UART_FRAME_ERROR"),
             (0x02, "UART_OVERRUN_ERROR"),
@@ -224,8 +229,12 @@ class BridgeGui(ctk.CTk):
                 "rs232ts": "-get rts",
                 "kliners": "-get krs",
                 "klinets": "-get kts",
-                "rs232re": "-get rre",
-                "klinere": "-get kre",
+                "rs232fe": "-get rfe",
+                "rs232oe": "-get roe",
+                "rs232pe": "-get rpe",
+                "klinefe": "-get kfe",
+                "klineoe": "-get koe",
+                "klinepe": "-get kpe",
                 "rs232rx": "-get rrx",
                 "rs232tx": "-get rtx",
                 "rs232br": "-get rbr",
@@ -507,9 +516,16 @@ class BridgeGui(ctk.CTk):
             ("KLine RX Overflows", "krs", 1, 2),
             ("RS232 TX Overflows", "rts", 2, 0),
             ("KLine TX Overflows", "kts", 2, 2),
-            ("RS232 RX Errors",   "rre", 3, 0),
-            ("KLine RX Errors",   "kre", 3, 2),
+            ("RS232 Framing Errors", "rfe", 4, 0),
+            ("KLine Framing Errors", "kfe", 4, 2),
+            ("RS232 Overrun Errors", "roe", 5, 0),
+            ("KLine Overrun Errors", "koe", 5, 2),
+            ("RS232 Parity Errors", "rpe", 6, 0),
+            ("KLine Parity Errors", "kpe", 6, 2),
         ]
+        ctk.CTkLabel(bridge_stats_frame, text="Detailed UART Errors", font=ctk.CTkFont(weight="bold")).grid(
+            row=3, column=0, columnspan=4, padx=(10, 6), pady=(8, 2), sticky="w"
+        )
         for title, key, row, col in bridge_rows:
             ctk.CTkLabel(bridge_stats_frame, text=title, font=ctk.CTkFont(weight="bold")).grid(
                 row=row, column=col, padx=(10, 6), pady=4, sticky="w"
@@ -1105,8 +1121,6 @@ class BridgeGui(ctk.CTk):
         bit_width = self.bridge_stat_bit_width.get(key)
         if bit_width:
             numeric &= (1 << bit_width) - 1
-            if key in {"rre", "kre"}:
-                return self._decode_uart_error_mask(numeric)
             return str(numeric)
 
         return raw_value
