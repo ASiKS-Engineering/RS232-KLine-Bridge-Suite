@@ -405,7 +405,7 @@ class BridgeGui(ctk.CTk):
 
         header = ctk.CTkFrame(self, corner_radius=12, border_width=1, border_color=self.CARD_BORDER)
         header.grid(row=1, column=0, sticky="ew", padx=12, pady=(4, 8))
-        header.grid_columnconfigure(10, weight=1)
+        header.grid_columnconfigure(8, weight=1)
 
         ctk.CTkLabel(header, text="Serial Port").grid(row=0, column=0, padx=(10, 6), pady=10)
         self.port_option = ctk.CTkOptionMenu(header, values=["-"])
@@ -443,11 +443,11 @@ class BridgeGui(ctk.CTk):
             width=90,
             command=lambda: self._send_bridge_command(self.commands["bridge_set"]["reset"]),
         )
-        self.reset_bridge_btn.grid(row=0, column=8, padx=(8, 6), pady=10)
+        self.reset_bridge_btn.grid(row=0, column=10, padx=(8, 10), pady=10, sticky="e")
         self._install_tooltip(self.reset_bridge_btn, "Reset bridge via -set rsb 1")
 
         self.processing_label = ctk.CTkLabel(header, text="", font=ctk.CTkFont(size=16, weight="bold"), text_color=("#2f81f7", "#2f81f7"), width=20)
-        self.processing_label.grid(row=0, column=9, padx=(12, 12), pady=10)
+        self.processing_label.grid(row=0, column=9, padx=(8, 8), pady=10, sticky="e")
 
         self.main_tabs = ctk.CTkTabview(
             self,
@@ -493,6 +493,11 @@ class BridgeGui(ctk.CTk):
         bridge_stats_header = ctk.CTkFrame(bridge_stats_frame, fg_color="transparent")
         bridge_stats_header.grid(row=0, column=0, sticky="ew", padx=(10, 12), pady=(10, 4))
         bridge_stats_header.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            bridge_stats_header,
+            text="Bridge Metrics and Errors",
+            font=ctk.CTkFont(size=18, weight="bold"),
+        ).grid(row=0, column=0, padx=(2, 10), pady=(2, 6), sticky="w")
         bridge_stats_actions = ctk.CTkFrame(bridge_stats_header, fg_color="transparent")
         bridge_stats_actions.grid(row=0, column=1, sticky="e")
         self.stats_refresh_btn = ctk.CTkButton(
@@ -521,12 +526,11 @@ class BridgeGui(ctk.CTk):
 
         bridge_stats_details = ctk.CTkFrame(bridge_stats_frame, fg_color="transparent")
         bridge_stats_details.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 10))
-        bridge_stats_details.grid_columnconfigure(0, weight=1)
-        bridge_stats_details.grid_columnconfigure(1, minsize=220)
-        bridge_stats_details.grid_columnconfigure(2, minsize=64)
-        bridge_stats_details.grid_columnconfigure(3, minsize=220)
-        bridge_stats_details.grid_columnconfigure(4, minsize=64)
-        bridge_stats_details.grid_columnconfigure(5, weight=1)
+        bridge_stats_details.grid_columnconfigure(0, weight=1, minsize=280)
+        bridge_stats_details.grid_columnconfigure(1, minsize=78)
+        bridge_stats_details.grid_columnconfigure(2, weight=1, minsize=280)
+        bridge_stats_details.grid_columnconfigure(3, minsize=78)
+        bridge_stats_details.grid_anchor("center")
 
         bridge_rows = [
             (("RS232 RX Overflows", "rrs"), ("KLine RX Overflows", "krs")),
@@ -535,37 +539,34 @@ class BridgeGui(ctk.CTk):
             (("RS232 Overrun Errors", "roe"), ("KLine Overrun Errors", "koe")),
             (("RS232 Parity Errors", "rpe"), ("KLine Parity Errors", "kpe")),
         ]
-        ctk.CTkLabel(bridge_stats_details, text="Detailed UART Errors", font=ctk.CTkFont(weight="bold")).grid(
-            row=0, column=0, columnspan=6, padx=(10, 10), pady=(0, 6), sticky="w"
-        )
-        for row_index, (left_item, right_item) in enumerate(bridge_rows, start=1):
+        for row_index, (left_item, right_item) in enumerate(bridge_rows):
             left_title, left_key = left_item
             right_title, right_key = right_item
 
-            ctk.CTkLabel(bridge_stats_details, text=left_title, font=ctk.CTkFont(weight="bold")).grid(
-                row=row_index, column=1, padx=(0, 6), pady=4, sticky="e"
+            ctk.CTkLabel(bridge_stats_details, text=left_title, font=ctk.CTkFont(size=14, weight="bold")).grid(
+                row=row_index, column=0, padx=(0, 8), pady=5, sticky="ew"
             )
             left_value_lbl = ctk.CTkLabel(
                 bridge_stats_details,
                 text="-",
-                width=56,
-                anchor="e",
-                font=ctk.CTkFont(family="Consolas", size=13),
+                width=72,
+                anchor="w",
+                font=ctk.CTkFont(family="Consolas", size=14),
             )
-            left_value_lbl.grid(row=row_index, column=2, padx=(0, 18), pady=4, sticky="w")
+            left_value_lbl.grid(row=row_index, column=1, padx=(0, 20), pady=5, sticky="w")
             self.bridge_stats_labels[left_key] = left_value_lbl
 
-            ctk.CTkLabel(bridge_stats_details, text=right_title, font=ctk.CTkFont(weight="bold")).grid(
-                row=row_index, column=3, padx=(0, 6), pady=4, sticky="e"
+            ctk.CTkLabel(bridge_stats_details, text=right_title, font=ctk.CTkFont(size=14, weight="bold")).grid(
+                row=row_index, column=2, padx=(0, 8), pady=5, sticky="ew"
             )
             right_value_lbl = ctk.CTkLabel(
                 bridge_stats_details,
                 text="-",
-                width=56,
-                anchor="e",
-                font=ctk.CTkFont(family="Consolas", size=13),
+                width=72,
+                anchor="w",
+                font=ctk.CTkFont(family="Consolas", size=14),
             )
-            right_value_lbl.grid(row=row_index, column=4, padx=(0, 12), pady=4, sticky="w")
+            right_value_lbl.grid(row=row_index, column=3, padx=(0, 12), pady=5, sticky="w")
             self.bridge_stats_labels[right_key] = right_value_lbl
 
         self.log_boxes["Statistics"] = ctk.CTkTextbox(
@@ -768,14 +769,12 @@ class BridgeGui(ctk.CTk):
 
         buffer_row = ctk.CTkFrame(settings_frame, fg_color="transparent")
         buffer_row.grid(row=2, column=0, columnspan=2, sticky="ew", padx=12, pady=(8, 10))
-        buffer_row.grid_columnconfigure(0, weight=1)
-        buffer_row.grid_columnconfigure(1, minsize=140)
-        buffer_row.grid_columnconfigure(2, minsize=520)
-        buffer_row.grid_columnconfigure(3, minsize=240)
-        buffer_row.grid_columnconfigure(4, weight=1)
+        buffer_row.grid_columnconfigure(0, minsize=130)
+        buffer_row.grid_columnconfigure(1, weight=1)
+        buffer_row.grid_columnconfigure(2, minsize=260)
 
         ctk.CTkLabel(buffer_row, text="Buffer Usage", font=ctk.CTkFont(weight="bold")).grid(
-            row=0, column=1, padx=(0, 10), pady=(0, 0), sticky="w"
+            row=0, column=0, padx=(0, 10), pady=0, sticky="w"
         )
         self.buffer_usage_bar = ctk.CTkFrame(
             buffer_row,
@@ -785,7 +784,7 @@ class BridgeGui(ctk.CTk):
             fg_color=("#e5e7eb", "#374151"),
             height=16,
         )
-        self.buffer_usage_bar.grid(row=0, column=2, padx=(0, 10), pady=(0, 0), sticky="ew")
+        self.buffer_usage_bar.grid(row=0, column=1, padx=(0, 12), pady=0, sticky="ew")
         self.buffer_usage_bar.grid_propagate(False)
 
         for index, (title, _key, color) in enumerate(self.buffer_segment_specs):
@@ -803,7 +802,7 @@ class BridgeGui(ctk.CTk):
             font=ctk.CTkFont(family="Consolas", size=12),
             text_color=("#4b5563", "#9ca3af"),
         )
-        self.buffer_fill_status_label.grid(row=0, column=3, padx=(0, 0), pady=(0, 0), sticky="e")
+        self.buffer_fill_status_label.grid(row=0, column=2, padx=0, pady=0, sticky="e")
 
         self.log_box = ctk.CTkTextbox(bridge_tab, wrap="word", corner_radius=12, border_width=1, border_color=self.CARD_BORDER)
         self.log_box.grid(row=2, column=0, sticky="nsew", pady=(0, 8))
@@ -830,7 +829,7 @@ class BridgeGui(ctk.CTk):
 
         self.fw_path_entry = ctk.CTkEntry(boot_frame)
         self.fw_path_entry.grid(row=2, column=1, padx=8, pady=6, sticky="ew")
-        self.pick_firmware_btn = ctk.CTkButton(boot_frame, text="Firmware...", width=200, command=self._pick_firmware)
+        self.pick_firmware_btn = ctk.CTkButton(boot_frame, text="Select File", width=200, command=self._pick_firmware)
         self.pick_firmware_btn.grid(
             row=2, column=2, padx=(8, 10), pady=6
         )
@@ -841,7 +840,7 @@ class BridgeGui(ctk.CTk):
 
         self.eeprom_path_entry = ctk.CTkEntry(boot_frame)
         self.eeprom_path_entry.grid(row=3, column=1, padx=8, pady=6, sticky="ew")
-        self.pick_eeprom_btn = ctk.CTkButton(boot_frame, text="EEPROM...", width=200, command=self._pick_eeprom)
+        self.pick_eeprom_btn = ctk.CTkButton(boot_frame, text="Select File", width=200, command=self._pick_eeprom)
         self.pick_eeprom_btn.grid(
             row=3, column=2, padx=(8, 10), pady=6
         )
