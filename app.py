@@ -35,6 +35,7 @@ class BridgeGui(ctk.CTk):
     BOOT_CONNECT_MAX_RETRIES = 3
     BOOT_CONNECT_RETRY_DELAY_S = 0.8
     BOOT_HANDSHAKE_TIMEOUT_S = 8.0
+    BRIDGE_DEVICE_ID = "RS232-KLine-Bridge"
 
     def __init__(self):
         super().__init__()
@@ -76,6 +77,7 @@ class BridgeGui(ctk.CTk):
         self._init_log_file()
         self.selected_port_baud = self.DEFAULT_PORT_BAUD
         self.selected_rs232_baud = self.DEFAULT_RS232_BAUD
+        self.last_connected_port = ""
         self.build_info = self._detect_build_info()
         self.active_tab_name = ""
 
@@ -657,6 +659,10 @@ class BridgeGui(ctk.CTk):
         self._install_tooltip(self.save_cfg_btn, "Parameter dauerhaft speichern (-set savecfg)")
 
         self.param_entries = {}
+        buffer_color_map = {
+            self.commands["bridge_set"][key]: color
+            for _title, key, color in self.buffer_segment_specs
+        }
         params = [
             ("RS232 RX Buffer Size", self.commands["bridge_set"]["rs232rx"], "buffer", 1, 0, 1),
             ("RS232 TX Buffer Size", self.commands["bridge_set"]["rs232tx"], "buffer", 2, 0, 1),
@@ -690,7 +696,11 @@ class BridgeGui(ctk.CTk):
             ctk.CTkLabel(settings_frame, text=title).grid(row=row, column=label_col, padx=label_padx, pady=pady, sticky="w")
 
             if control_type == "buffer":
-                control = ctk.CTkComboBox(settings_frame, values=self.buffer_labels)
+                buf_color = buffer_color_map.get(cmd)
+                control = ctk.CTkComboBox(
+                    settings_frame, values=self.buffer_labels,
+                    border_color=buf_color, button_color=buf_color, button_hover_color=buf_color,
+                )
                 control.set("64 Bytes")
             elif control_type == "baud":
                 control = ctk.CTkComboBox(settings_frame, values=self.param_baud_values)
@@ -729,14 +739,6 @@ class BridgeGui(ctk.CTk):
             )
             segment.place(relx=0, rely=0, relheight=1, relwidth=0)
             self.buffer_usage_segments[title] = segment
-
-            legend = ctk.CTkLabel(
-                settings_frame,
-                text=title,
-                font=ctk.CTkFont(size=11),
-                text_color=color,
-            )
-            legend.grid(row=6, column=index, columnspan=1, padx=(12, 6), pady=(0, 6), sticky="w")
 
         self.buffer_fill_status_label = ctk.CTkLabel(
             settings_frame,
@@ -1403,12 +1405,14 @@ class BridgeGui(ctk.CTk):
             )
             self.debug_logging_enabled = bool(data.get("debug_logging", True))
             self.debug_logging_var.set(self.debug_logging_enabled)
+            self.last_connected_port = str(data.get("last_port", ""))
         except Exception:
             self.selected_ui_mode = "Automatisch"
             self.selected_port_baud = self.DEFAULT_PORT_BAUD
             self.selected_rs232_baud = self.DEFAULT_RS232_BAUD
             self.debug_logging_enabled = True
             self.debug_logging_var.set(True)
+            self.last_connected_port = ""
 
         ctk.set_appearance_mode(self.ui_mode_map[self.selected_ui_mode])
 
@@ -1418,6 +1422,7 @@ class BridgeGui(ctk.CTk):
             "port_baud": self.selected_port_baud,
             "rs232_baud": self.selected_rs232_baud,
             "debug_logging": self.debug_logging_enabled,
+            "last_port": self.last_connected_port,
         }
         try:
             with open(self.config_path, "w", encoding="utf-8") as fp:
@@ -1430,7 +1435,10 @@ class BridgeGui(ctk.CTk):
         if not ports:
             ports = ["-"]
         self.port_option.configure(values=ports)
-        self.port_option.set(ports[0])
+        if self.last_connected_port and self.last_connected_port in ports:
+            self.port_option.set(self.last_connected_port)
+        else:
+            self.port_option.set(ports[0])
 
     def _toggle_connection(self):
         if self.serial_port and self.serial_port.is_open:
@@ -1477,11 +1485,13 @@ class BridgeGui(ctk.CTk):
         self.dtr_switch.select()
         self.serial_port.dtr = True
         self._update_dtr_indicator(True)
+        self.last_connected_port = port
+        self._save_app_config()
         msg = f"Connected to {port} @ {baud}."
         self._log(msg)
         self._log("DTR set to ON (auto).")
         if request_version:
-            self._request_bridge_version()
+            self._request_bridge_version(on_connect=True)
         self._refresh_statistics_display()
         return True, "SUCCESS"
 
@@ -1600,7 +1610,7 @@ class BridgeGui(ctk.CTk):
         color = "#22c55e" if enabled else "#9ca3af"
         self.dtr_status_bubble.configure(fg_color=color)
 
-    def _request_bridge_version(self):
+    def _request_bridge_version(self, on_connect: bool = False):
         if not self.serial_port or not self.serial_port.is_open:
             return
         if not bool(self.dtr_switch.get()):
@@ -1611,6 +1621,7 @@ class BridgeGui(ctk.CTk):
             except Exception:
                 pass
             self.version_timeout_after_id = None
+        self.version_request_on_connect = on_connect
         self.awaiting_version_response = True
         if not self._write_serial_line(self.commands["bridge_get"]["version"]):
             self.awaiting_version_response = False
@@ -1623,8 +1634,16 @@ class BridgeGui(ctk.CTk):
         self.version_timeout_after_id = None
         if not self.awaiting_version_response:
             return
+        on_connect = self.version_request_on_connect
         self.awaiting_version_response = False
+        self.version_request_on_connect = False
         self._log("Version request timeout.")
+        if on_connect:
+            self.after(0, lambda: messagebox.showwarning(
+                "Kein Geraet erkannt",
+                f"Keine Antwort vom Geraet erhalten.\n"
+                f"Moegliche Ursachen: Geraet nicht verbunden, falsche Baudrate oder falscher Port.",
+            ))
 
     def _cancel_version_request(self):
         if self.version_timeout_after_id is not None:
@@ -1636,8 +1655,19 @@ class BridgeGui(ctk.CTk):
         self.awaiting_version_response = False
 
     def _set_bridge_fw_version(self, text: str):
-        self.bridge_fw_version = text.strip() if text else "-"
+        version = text.strip() if text else "-"
+        self.bridge_fw_version = version
         self.bridge_fw_label.configure(text=self.bridge_fw_version)
+        if self.version_request_on_connect:
+            self.version_request_on_connect = False
+            if self.BRIDGE_DEVICE_ID not in version:
+                self.after(0, lambda v=version: messagebox.showwarning(
+                    "Geraet nicht erkannt",
+                    f"Die Geraeteantwort entspricht nicht dem erwarteten Bridge-Geraet.\n\n"
+                    f"Erwartet: '...{self.BRIDGE_DEVICE_ID}...'\n"
+                    f"Erhalten:  '{v}'\n\n"
+                    f"Bitte Port und Baudrate pruefen.",
+                ))
         self._refresh_statistics_display()
 
     def _normalize_ack_text(self, message: str) -> str:
