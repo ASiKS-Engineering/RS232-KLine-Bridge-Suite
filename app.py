@@ -60,6 +60,7 @@ class BridgeGui(ctk.CTk):
         self.debug_logging_enabled = True
         self.bridge_fw_version = "-"
         self.awaiting_version_response = False
+        self.version_request_on_connect = False
         self.app_start_time = time.time()
         self.tx_count = 0
         self.rx_count = 0
@@ -69,10 +70,10 @@ class BridgeGui(ctk.CTk):
         self.last_rx = "-"
         self.stats_value_labels = {}
         self.bridge_stats_labels = {}
-        self.ui_mode_map = {"Hell": "Light", "Dunkel": "Dark", "Automatisch": "System"}
+        self.ui_mode_map = {"Light": "Light", "Dark": "Dark", "Automatic": "System"}
         self.terminal_mode_values = ["String", "Character", "Bytes (Hex)"]
         self.config_path = os.path.join(os.path.dirname(__file__), "app_config.json")
-        self.selected_ui_mode = "Automatisch"
+        self.selected_ui_mode = "Automatic"
         self.log_file_path = os.path.join(os.path.dirname(__file__), "debug_log.txt")
         self._init_log_file()
         self.selected_port_baud = self.DEFAULT_PORT_BAUD
@@ -476,7 +477,7 @@ class BridgeGui(ctk.CTk):
 
         stats_tab = self.main_tabs.tab("Statistics")
         stats_tab.grid_columnconfigure(0, weight=1)
-        stats_tab.grid_rowconfigure(1, weight=1)
+        stats_tab.grid_rowconfigure(2, weight=1)
 
         terminal_tab = self.main_tabs.tab("Terminal")
         terminal_tab.grid_columnconfigure(0, weight=1)
@@ -488,57 +489,90 @@ class BridgeGui(ctk.CTk):
 
         bridge_stats_frame = ctk.CTkFrame(stats_tab, corner_radius=12, border_width=1, border_color=self.CARD_BORDER)
         bridge_stats_frame.grid(row=0, column=0, sticky="ew", pady=(8, 8))
-        bridge_stats_frame.grid_columnconfigure((1, 3), weight=1)
+        bridge_stats_frame.grid_columnconfigure(0, weight=1)
+        bridge_stats_header = ctk.CTkFrame(bridge_stats_frame, fg_color="transparent")
+        bridge_stats_header.grid(row=0, column=0, sticky="ew", padx=(10, 12), pady=(10, 4))
+        bridge_stats_header.grid_columnconfigure(0, weight=1)
+        bridge_stats_actions = ctk.CTkFrame(bridge_stats_header, fg_color="transparent")
+        bridge_stats_actions.grid(row=0, column=1, sticky="e")
         self.stats_refresh_btn = ctk.CTkButton(
-            bridge_stats_frame,
-            text="↻",
+            bridge_stats_actions,
+            text="⭱",
             width=62,
             height=40,
             corner_radius=10,
             font=ctk.CTkFont(size=22, weight="bold"),
             command=self._refresh_bridge_statistics,
         )
-        self.stats_refresh_btn.grid(row=0, column=3, padx=(0, 10), pady=(10, 8), sticky="e")
-        self._install_tooltip(self.stats_refresh_btn, "Bridge-Statistiken abfragen und aktualisieren")
+        self.stats_refresh_btn.grid(row=0, column=0, padx=(0, 6), pady=0, sticky="e")
+        self._install_tooltip(self.stats_refresh_btn, "Request and refresh bridge statistics")
 
         self.stats_reset_btn = ctk.CTkButton(
-            bridge_stats_frame,
-            text="Reset Statistics",
-            width=150,
-            height=36,
+            bridge_stats_actions,
+            text="⌫",
+            width=62,
+            height=40,
+            corner_radius=10,
+            font=ctk.CTkFont(size=22, weight="bold"),
             command=self._reset_runtime_statistics,
         )
-        self.stats_reset_btn.grid(row=0, column=2, padx=(0, 10), pady=(10, 8), sticky="e")
-        self._install_tooltip(self.stats_reset_btn, "Reset runtime statistics")
+        self.stats_reset_btn.grid(row=0, column=1, padx=0, pady=0, sticky="e")
+        self._install_tooltip(self.stats_reset_btn, "Clear runtime statistics values")
+
+        bridge_stats_details = ctk.CTkFrame(bridge_stats_frame, fg_color="transparent")
+        bridge_stats_details.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 10))
+        bridge_stats_details.grid_columnconfigure(0, weight=1)
+        bridge_stats_details.grid_columnconfigure(1, minsize=220)
+        bridge_stats_details.grid_columnconfigure(2, minsize=64)
+        bridge_stats_details.grid_columnconfigure(3, minsize=220)
+        bridge_stats_details.grid_columnconfigure(4, minsize=64)
+        bridge_stats_details.grid_columnconfigure(5, weight=1)
 
         bridge_rows = [
-            ("RS232 RX Overflows", "rrs", 1, 0),
-            ("KLine RX Overflows", "krs", 1, 2),
-            ("RS232 TX Overflows", "rts", 2, 0),
-            ("KLine TX Overflows", "kts", 2, 2),
-            ("RS232 Framing Errors", "rfe", 4, 0),
-            ("KLine Framing Errors", "kfe", 4, 2),
-            ("RS232 Overrun Errors", "roe", 5, 0),
-            ("KLine Overrun Errors", "koe", 5, 2),
-            ("RS232 Parity Errors", "rpe", 6, 0),
-            ("KLine Parity Errors", "kpe", 6, 2),
+            (("RS232 RX Overflows", "rrs"), ("KLine RX Overflows", "krs")),
+            (("RS232 TX Overflows", "rts"), ("KLine TX Overflows", "kts")),
+            (("RS232 Framing Errors", "rfe"), ("KLine Framing Errors", "kfe")),
+            (("RS232 Overrun Errors", "roe"), ("KLine Overrun Errors", "koe")),
+            (("RS232 Parity Errors", "rpe"), ("KLine Parity Errors", "kpe")),
         ]
-        ctk.CTkLabel(bridge_stats_frame, text="Detailed UART Errors", font=ctk.CTkFont(weight="bold")).grid(
-            row=3, column=0, columnspan=4, padx=(10, 6), pady=(8, 2), sticky="w"
+        ctk.CTkLabel(bridge_stats_details, text="Detailed UART Errors", font=ctk.CTkFont(weight="bold")).grid(
+            row=0, column=0, columnspan=6, padx=(10, 10), pady=(0, 6), sticky="w"
         )
-        for title, key, row, col in bridge_rows:
-            ctk.CTkLabel(bridge_stats_frame, text=title, font=ctk.CTkFont(weight="bold")).grid(
-                row=row, column=col, padx=(10, 6), pady=4, sticky="w"
+        for row_index, (left_item, right_item) in enumerate(bridge_rows, start=1):
+            left_title, left_key = left_item
+            right_title, right_key = right_item
+
+            ctk.CTkLabel(bridge_stats_details, text=left_title, font=ctk.CTkFont(weight="bold")).grid(
+                row=row_index, column=1, padx=(0, 6), pady=4, sticky="e"
             )
-            value_lbl = ctk.CTkLabel(bridge_stats_frame, text="-", font=ctk.CTkFont(family="Consolas", size=13))
-            value_lbl.grid(row=row, column=col + 1, padx=(0, 10), pady=4, sticky="w")
-            self.bridge_stats_labels[key] = value_lbl
+            left_value_lbl = ctk.CTkLabel(
+                bridge_stats_details,
+                text="-",
+                width=56,
+                anchor="e",
+                font=ctk.CTkFont(family="Consolas", size=13),
+            )
+            left_value_lbl.grid(row=row_index, column=2, padx=(0, 18), pady=4, sticky="w")
+            self.bridge_stats_labels[left_key] = left_value_lbl
+
+            ctk.CTkLabel(bridge_stats_details, text=right_title, font=ctk.CTkFont(weight="bold")).grid(
+                row=row_index, column=3, padx=(0, 6), pady=4, sticky="e"
+            )
+            right_value_lbl = ctk.CTkLabel(
+                bridge_stats_details,
+                text="-",
+                width=56,
+                anchor="e",
+                font=ctk.CTkFont(family="Consolas", size=13),
+            )
+            right_value_lbl.grid(row=row_index, column=4, padx=(0, 12), pady=4, sticky="w")
+            self.bridge_stats_labels[right_key] = right_value_lbl
 
         self.log_boxes["Statistics"] = ctk.CTkTextbox(
             stats_tab, wrap="word", corner_radius=12, border_width=1,
             border_color=self.CARD_BORDER, font=ctk.CTkFont(family="Consolas", size=12),
         )
-        self.log_boxes["Statistics"].grid(row=1, column=0, sticky="nsew", pady=(0, 8))
+        self.log_boxes["Statistics"].grid(row=2, column=0, sticky="nsew", pady=(0, 8))
 
         terminal_ctrl = ctk.CTkFrame(terminal_tab, corner_radius=12, border_width=1, border_color=self.CARD_BORDER)
         terminal_ctrl.grid(row=0, column=0, sticky="ew", pady=(8, 8))
@@ -631,7 +665,7 @@ class BridgeGui(ctk.CTk):
         ctk.CTkLabel(status_frame, text="Mode:").grid(row=0, column=3, padx=(6, 6), pady=8, sticky="e")
         self.mode_option = ctk.CTkOptionMenu(
             status_frame,
-            values=["Hell", "Dunkel", "Automatisch"],
+            values=["Light", "Dark", "Automatic"],
             width=140,
             command=self._on_mode_change,
         )
@@ -640,18 +674,29 @@ class BridgeGui(ctk.CTk):
 
         settings_frame = ctk.CTkFrame(bridge_tab, corner_radius=12, border_width=1, border_color=self.CARD_BORDER)
         settings_frame.grid(row=1, column=0, sticky="ew", pady=(8, 8))
-        settings_frame.grid_columnconfigure(0, minsize=190)
+        settings_frame.grid_columnconfigure(0, weight=1)
         settings_frame.grid_columnconfigure(1, weight=1)
-        settings_frame.grid_columnconfigure(2, minsize=190)
-        settings_frame.grid_columnconfigure(3, weight=1)
-        settings_frame.grid_columnconfigure(4, minsize=70)
-        settings_frame.grid_columnconfigure(5, minsize=70)
-        ctk.CTkLabel(settings_frame, text="Parameters", font=ctk.CTkFont(size=18, weight="bold")).grid(
-            row=0, column=0, padx=(14, 10), pady=(10, 14), sticky="w"
+        settings_header = ctk.CTkFrame(settings_frame, fg_color="transparent")
+        settings_header.grid(row=0, column=0, columnspan=2, sticky="ew", padx=(12, 12), pady=(8, 6))
+        settings_header.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(settings_header, text="Parameters", font=ctk.CTkFont(size=18, weight="bold")).grid(
+            row=0, column=0, padx=(2, 10), pady=(2, 6), sticky="w"
         )
+        config_actions = ctk.CTkFrame(settings_header, fg_color="transparent")
+        config_actions.grid(row=0, column=1, sticky="e")
+
+        settings_details = ctk.CTkFrame(settings_frame, fg_color="transparent")
+        settings_details.grid(row=1, column=0, columnspan=2, sticky="ew", padx=12, pady=(2, 6))
+        settings_details.grid_columnconfigure(0, weight=1)
+        settings_details.grid_columnconfigure(1, minsize=210)
+        settings_details.grid_columnconfigure(2, minsize=190)
+        settings_details.grid_columnconfigure(3, minsize=34)
+        settings_details.grid_columnconfigure(4, minsize=210)
+        settings_details.grid_columnconfigure(5, minsize=190)
+        settings_details.grid_columnconfigure(6, weight=1)
 
         self.upload_cfg_btn = ctk.CTkButton(
-            settings_frame,
+            config_actions,
             text="⭱",
             width=62,
             height=40,
@@ -659,11 +704,11 @@ class BridgeGui(ctk.CTk):
             font=ctk.CTkFont(size=22, weight="bold"),
             command=self._upload_bridge_config,
         )
-        self.upload_cfg_btn.grid(row=0, column=4, padx=(8, 6), pady=(8, 10), sticky="e")
+        self.upload_cfg_btn.grid(row=0, column=0, padx=(0, 6), pady=0, sticky="e")
         self._install_tooltip(self.upload_cfg_btn, "Read current bridge parameters")
 
         self.save_cfg_btn = ctk.CTkButton(
-            settings_frame,
+            config_actions,
             text="⭳",
             width=62,
             height=40,
@@ -671,7 +716,7 @@ class BridgeGui(ctk.CTk):
             font=ctk.CTkFont(size=22, weight="bold"),
             command=lambda: self._send_bridge_command(self.commands["bridge_set"]["savecfg"]),
         )
-        self.save_cfg_btn.grid(row=0, column=5, padx=(0, 12), pady=(8, 10), sticky="e")
+        self.save_cfg_btn.grid(row=0, column=1, padx=0, pady=0, sticky="e")
         self._install_tooltip(self.save_cfg_btn, "Save parameters permanently (-set savecfg)")
 
         self.param_entries = {}
@@ -680,71 +725,67 @@ class BridgeGui(ctk.CTk):
             for _title, key, color in self.buffer_segment_specs
         }
         params = [
-            ("RS232 RX Buffer Size", self.commands["bridge_set"]["rs232rx"], "buffer", 1, 0, 1),
-            ("RS232 TX Buffer Size", self.commands["bridge_set"]["rs232tx"], "buffer", 2, 0, 1),
-            ("RS232 Baud Rate", self.commands["bridge_set"]["rs232br"], "baud", 3, 0, 1),
-            ("KLine RX Buffer Size", self.commands["bridge_set"]["klinerx"], "buffer", 1, 2, 3),
-            ("KLine TX Buffer Size", self.commands["bridge_set"]["klinetx"], "buffer", 2, 2, 3),
-            ("KLine Baud Rate", self.commands["bridge_set"]["klinebr"], "baud", 3, 2, 3),
-            ("DTR Forwarding", self.commands["bridge_set"]["dtr_fwd"], "fwd", 4, 1, 2),
+            ("RS232 RX Buffer Size", self.commands["bridge_set"]["rs232rx"], "buffer", 0, 1, 2),
+            ("RS232 TX Buffer Size", self.commands["bridge_set"]["rs232tx"], "buffer", 1, 1, 2),
+            ("RS232 Baud Rate", self.commands["bridge_set"]["rs232br"], "baud", 2, 1, 2),
+            ("KLine RX Buffer Size", self.commands["bridge_set"]["klinerx"], "buffer", 0, 4, 5),
+            ("KLine TX Buffer Size", self.commands["bridge_set"]["klinetx"], "buffer", 1, 4, 5),
+            ("KLine Baud Rate", self.commands["bridge_set"]["klinebr"], "baud", 2, 4, 5),
+            ("DTR Forwarding", self.commands["bridge_set"]["dtr_fwd"], "fwd", 3, 1, 2),
         ]
 
         for title, cmd, control_type, row, label_col, control_col in params:
-            rs232_prefix = self.commands["bridge_set"]["rs232rx"].rsplit("rx", maxsplit=1)[0]
-            kline_prefix = self.commands["bridge_set"]["klinerx"].rsplit("rx", maxsplit=1)[0]
-            dtr_cmd = self.commands["bridge_set"]["dtr_fwd"]
             kline_baud_cmd = self.commands["bridge_set"]["klinebr"]
 
-            pady = (12, 6) if cmd == dtr_cmd else 6
-            if cmd.startswith(rs232_prefix):
-                label_padx = (12, 6)
-                control_padx = (0, 10)
-            elif cmd.startswith(kline_prefix):
-                label_padx = (12, 6)
-                control_padx = (0, 10)
-            elif cmd == dtr_cmd:
-                label_padx = (8, 2)
-                control_padx = (0, 8)
-            else:
-                label_padx = (8, 6)
-                control_padx = (8, 8)
+            pady = 6
+            label_padx = (0, 10)
+            control_padx = (0, 12)
 
-            ctk.CTkLabel(settings_frame, text=title).grid(row=row, column=label_col, padx=label_padx, pady=pady, sticky="w")
+            ctk.CTkLabel(settings_details, text=title).grid(row=row, column=label_col, padx=label_padx, pady=pady, sticky="w")
 
             if control_type == "buffer":
                 buf_color = buffer_color_map.get(cmd)
                 control = ctk.CTkComboBox(
-                    settings_frame, values=self.buffer_labels,
+                    settings_details, values=self.buffer_labels,
+                    width=170,
                     border_color=buf_color, button_color=buf_color, button_hover_color=buf_color,
                 )
                 control.set("64 Bytes")
             elif control_type == "baud":
-                control = ctk.CTkComboBox(settings_frame, values=self.param_baud_values)
+                control = ctk.CTkComboBox(settings_details, values=self.param_baud_values, width=170)
                 control.set("10400" if cmd == kline_baud_cmd else self.selected_rs232_baud)
             elif control_type == "fwd":
-                control = ctk.CTkComboBox(settings_frame, values=self.fwd_labels)
+                control = ctk.CTkComboBox(settings_details, values=self.fwd_labels, width=170)
                 control.set(self.fwd_labels[1])
             else:
-                control = ctk.CTkEntry(settings_frame)
+                control = ctk.CTkEntry(settings_details, width=170)
 
-            control.grid(row=row, column=control_col, padx=control_padx, pady=pady, sticky="ew")
+            control.grid(row=row, column=control_col, padx=control_padx, pady=pady, sticky="w")
             self.param_entries[cmd] = {"widget": control, "type": control_type}
             self.param_confirmed_values[cmd] = control.get().strip()
             control.configure(command=lambda _v=None, c=cmd: self._on_param_control_changed(c))
             control.bind("<Return>", lambda _e, c=cmd: self._on_param_enter_pressed(c))
 
-        ctk.CTkLabel(settings_frame, text="Buffer Usage", font=ctk.CTkFont(weight="bold")).grid(
-            row=5, column=0, padx=(12, 6), pady=(12, 10), sticky="w"
+        buffer_row = ctk.CTkFrame(settings_frame, fg_color="transparent")
+        buffer_row.grid(row=2, column=0, columnspan=2, sticky="ew", padx=12, pady=(8, 10))
+        buffer_row.grid_columnconfigure(0, weight=1)
+        buffer_row.grid_columnconfigure(1, minsize=140)
+        buffer_row.grid_columnconfigure(2, minsize=520)
+        buffer_row.grid_columnconfigure(3, minsize=240)
+        buffer_row.grid_columnconfigure(4, weight=1)
+
+        ctk.CTkLabel(buffer_row, text="Buffer Usage", font=ctk.CTkFont(weight="bold")).grid(
+            row=0, column=1, padx=(0, 10), pady=(0, 0), sticky="w"
         )
         self.buffer_usage_bar = ctk.CTkFrame(
-            settings_frame,
+            buffer_row,
             corner_radius=7,
             border_width=1,
             border_color=self.CARD_BORDER,
             fg_color=("#e5e7eb", "#374151"),
             height=16,
         )
-        self.buffer_usage_bar.grid(row=5, column=1, columnspan=3, padx=(0, 10), pady=(12, 10), sticky="ew")
+        self.buffer_usage_bar.grid(row=0, column=2, padx=(0, 10), pady=(0, 0), sticky="ew")
         self.buffer_usage_bar.grid_propagate(False)
 
         for index, (title, _key, color) in enumerate(self.buffer_segment_specs):
@@ -757,12 +798,12 @@ class BridgeGui(ctk.CTk):
             self.buffer_usage_segments[title] = segment
 
         self.buffer_fill_status_label = ctk.CTkLabel(
-            settings_frame,
+            buffer_row,
             text="Used: 0 B / Max: -",
             font=ctk.CTkFont(family="Consolas", size=12),
             text_color=("#4b5563", "#9ca3af"),
         )
-        self.buffer_fill_status_label.grid(row=5, column=4, columnspan=2, padx=(0, 12), pady=(12, 10), sticky="e")
+        self.buffer_fill_status_label.grid(row=0, column=3, padx=(0, 0), pady=(0, 0), sticky="e")
 
         self.log_box = ctk.CTkTextbox(bridge_tab, wrap="word", corner_radius=12, border_width=1, border_color=self.CARD_BORDER)
         self.log_box.grid(row=2, column=0, sticky="nsew", pady=(0, 8))
@@ -1386,10 +1427,10 @@ class BridgeGui(ctk.CTk):
     def _normalize_ui_mode(self, mode_value: str) -> str:
         value = (mode_value or "").strip().lower()
         if value in {"hell", "light"}:
-            return "Hell"
+            return "Light"
         if value in {"dunkel", "dark"}:
-            return "Dunkel"
-        return "Automatisch"
+            return "Dark"
+        return "Automatic"
 
     def _normalize_baud_value(self, value: str, fallback: str) -> str:
         candidate = (value or "").strip()
@@ -1407,7 +1448,7 @@ class BridgeGui(ctk.CTk):
         try:
             with open(self.config_path, "r", encoding="utf-8") as fp:
                 data = json.load(fp)
-            stored_mode = self._normalize_ui_mode(str(data.get("ui_mode", "Automatisch")))
+            stored_mode = self._normalize_ui_mode(str(data.get("ui_mode", "Automatic")))
             self.selected_ui_mode = stored_mode
             self.selected_port_baud = self._normalize_baud_value(
                 str(data.get("port_baud", self.DEFAULT_PORT_BAUD)),
@@ -1421,7 +1462,7 @@ class BridgeGui(ctk.CTk):
             self.debug_logging_var.set(self.debug_logging_enabled)
             self.last_connected_port = str(data.get("last_port", ""))
         except Exception:
-            self.selected_ui_mode = "Automatisch"
+            self.selected_ui_mode = "Automatic"
             self.selected_port_baud = self.DEFAULT_PORT_BAUD
             self.selected_rs232_baud = self.DEFAULT_RS232_BAUD
             self.debug_logging_enabled = True
@@ -1675,7 +1716,7 @@ class BridgeGui(ctk.CTk):
         version = text.strip() if text else "-"
         self.bridge_fw_version = version
         self.bridge_fw_label.configure(text=self.bridge_fw_version)
-        if self.version_request_on_connect:
+        if getattr(self, "version_request_on_connect", False):
             self.version_request_on_connect = False
             if self.BRIDGE_DEVICE_ID not in version:
                 self.after(0, lambda v=version: [
