@@ -1509,6 +1509,7 @@ class BridgeGui(ctk.CTk):
                     with self.awaiting_response_lock:
                         response_key = self.awaiting_response_key
                         response_event = self.awaiting_response_event
+                        self._log(f"DEBUG reader rx_check: key={repr(response_key)}, event={response_event is not None}, is_set={response_event.is_set() if response_event else 'N/A'}, msg='{msg}'")
                         if response_key is not None and response_event is not None and not response_event.is_set():
                             if msg:
                                 self._log(f"DEBUG reader check: key='{response_key}', msg='{msg}', is_set={response_event.is_set()}")
