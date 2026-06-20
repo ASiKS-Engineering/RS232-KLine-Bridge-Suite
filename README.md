@@ -28,8 +28,10 @@ GUI for controlling and monitoring an RS232/K-Line bridge and its bootloader.
 ## Run
 
 ```bash
-python app.py
+python bridge_suite.py
 ```
+
+The packaged Windows executable is created in `dist/` as `RS232-KLine Bridge Suite.exe`.
 
 ## Command Reference
 
