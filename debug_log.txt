@@ -1,6 +1,5 @@
-[17:59:53] DEBUG param set echo start: cmd='-set krx 64'
-[17:59:53] DEBUG await start: key='set_rsp', cmd='-set krx 64', timeout=2.00s, event_id=1804941659824
-[17:59:53] TX: -set krx 64
-[17:59:53] RX: 64
-[17:59:55] DEBUG await timeout: key='set_rsp', cmd='-set krx 64', event_id=1804941659824
-[17:59:55] DEBUG reader rx_check: key=None, event=False, is_set=N/A, msg='64'
+[18:07:00] DEBUG param set echo start: cmd='-set krx 64'
+[18:07:00] DEBUG await start: key='set_rsp', cmd='-set krx 64', timeout=2.00s, event_id=1533533884944
+[18:07:00] TX: -set krx 64
+[18:07:00] RX: 64
+[18:07:02] DEBUG await timeout: key='set_rsp', cmd='-set krx 64', event_id=1533533884944
