@@ -1061,33 +1061,20 @@ class BridgeGui(ctk.CTk):
             return
 
         command = f"{self.commands['bridge_set']['savecfg']} 1"
-        self._set_processing(True)
-        try:
-            self._log(f"DEBUG savecfg start: cmd='{command}'")
-            ok, response = self._query_bridge_value(command, "set_rsp", timeout=2.0)
-            if not ok:
-                self._log(f"DEBUG savecfg transport-fail: cmd='{command}', result='{response}'")
-                messagebox.showwarning("Bridge", f"No valid response for {command}: {response}")
-                return
+        self._log(f"DEBUG savecfg start: cmd='{command}'")
+        set_ok, set_response = self._query_bridge_value(command, "set_rsp", timeout=2.0)
+        if not set_ok:
+            self._log(f"DEBUG savecfg transport-fail: cmd='{command}', result='{set_response}'")
+            messagebox.showwarning("Bridge", f"No valid response for {command}: {set_response}")
+            return
 
-            self._log(f"DEBUG savecfg rx: raw='{response}'")
-            if self._is_set_error_response(response):
-                self._log(f"Save rejected: {command} -> {response}")
-                messagebox.showwarning("Bridge ERR", f"Bridge rejected config save: {response}")
-                return
+        self._log(f"DEBUG savecfg response: cmd='{command}', response='{set_response}'")
+        if self._is_set_error_response(set_response):
+            self._log(f"Save rejected: {command} -> {set_response}")
+            messagebox.showwarning("Bridge ERR", f"Bridge rejected config save: {set_response}")
+            return
 
-            echoed_value = self._extract_numeric_value(response)
-            if echoed_value != 1:
-                self._log(f"Save rejected: {command} -> unexpected response '{response}'")
-                messagebox.showwarning(
-                    "Bridge",
-                    f"Unexpected response for {command}: {response}\nExpected: 1 or ERROR",
-                )
-                return
-
-            self._log(f"Config save acknowledged: {command} -> {response}")
-        finally:
-            self._set_processing(False)
+        self._log(f"Config save acknowledged: {command} -> {set_response}")
 
     def _schedule_param_auto_refresh(self):
         if self.param_refresh_running:
