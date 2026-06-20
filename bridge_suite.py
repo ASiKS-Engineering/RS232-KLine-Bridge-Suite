@@ -248,7 +248,7 @@ class BridgeGui(ctk.CTk):
             },
             "bridge_set": {
                 "reset": "-set rsb 1",
-                "savecfg": "-set scg 1",
+                "savecfg": "-set scg",
                 "kline_high": "-set ksh",
                 "kline_low": "-set ksl",
                 "kline_pulse_prefix": "-set ksp",
@@ -715,10 +715,7 @@ class BridgeGui(ctk.CTk):
             height=40,
             corner_radius=10,
             font=ctk.CTkFont(size=22, weight="bold"),
-            command=lambda: self._send_set_command_with_response(
-                self.commands["bridge_set"]["savecfg"],
-                show_warnings=True,
-            ),
+            command=self._send_save_config,
         )
         self.save_cfg_btn.grid(row=0, column=1, padx=0, pady=0, sticky="e")
         self._install_tooltip(self.save_cfg_btn, "Save parameters permanently (-set scg 1)")
@@ -1058,6 +1055,39 @@ class BridgeGui(ctk.CTk):
             return
         self.upload_cfg_btn.configure(state="disabled")
         threading.Thread(target=self._upload_bridge_config_worker, daemon=True).start()
+
+    def _send_save_config(self):
+        if not self._can_send_bridge_commands():
+            return
+
+        command = f"{self.commands['bridge_set']['savecfg']} 1"
+        self._set_processing(True)
+        try:
+            self._log(f"DEBUG savecfg start: cmd='{command}'")
+            ok, response = self._query_bridge_value(command, "set_rsp", timeout=2.0)
+            if not ok:
+                self._log(f"DEBUG savecfg transport-fail: cmd='{command}', result='{response}'")
+                messagebox.showwarning("Bridge", f"No valid response for {command}: {response}")
+                return
+
+            self._log(f"DEBUG savecfg rx: raw='{response}'")
+            if self._is_set_error_response(response):
+                self._log(f"Save rejected: {command} -> {response}")
+                messagebox.showwarning("Bridge ERR", f"Bridge rejected config save: {response}")
+                return
+
+            echoed_value = self._extract_numeric_value(response)
+            if echoed_value != 1:
+                self._log(f"Save rejected: {command} -> unexpected response '{response}'")
+                messagebox.showwarning(
+                    "Bridge",
+                    f"Unexpected response for {command}: {response}\nExpected: 1 or ERROR",
+                )
+                return
+
+            self._log(f"Config save acknowledged: {command} -> {response}")
+        finally:
+            self._set_processing(False)
 
     def _schedule_param_auto_refresh(self):
         if self.param_refresh_running:
