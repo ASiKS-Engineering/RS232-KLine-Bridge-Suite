@@ -174,36 +174,36 @@ class BridgeGui(ctk.CTk):
         menubar = Menu(self)
 
         file_menu = Menu(menubar, tearoff=0)
-        file_menu.add_command(label="Verbinden / Trennen", command=self._toggle_connection)
-        file_menu.add_command(label="Ports aktualisieren", command=self._refresh_ports)
+        file_menu.add_command(label="Connect / Disconnect", command=self._toggle_connection)
+        file_menu.add_command(label="Refresh Ports", command=self._refresh_ports)
         file_menu.add_separator()
-        file_menu.add_command(label="Beenden", command=self._on_close)
-        menubar.add_cascade(label="Datei", menu=file_menu)
+        file_menu.add_command(label="Exit", command=self._on_close)
+        menubar.add_cascade(label="File", menu=file_menu)
 
         view_menu = Menu(menubar, tearoff=0)
-        view_menu.add_command(label="Log leeren", command=self._clear_log)
+        view_menu.add_command(label="Clear Log", command=self._clear_log)
         view_menu.add_checkbutton(label="Auto-Scroll Log", variable=self.log_autoscroll_var)
         view_menu.add_checkbutton(
-            label="Debug-Ausgaben",
+            label="Debug Output",
             variable=self.debug_logging_var,
             command=self._on_debug_logging_toggle,
         )
-        menubar.add_cascade(label="Ansicht", menu=view_menu)
+        menubar.add_cascade(label="View", menu=view_menu)
 
         tools_menu = Menu(menubar, tearoff=0)
-        tools_menu.add_command(label="Bootloader verbinden", command=self._connect_to_bootloader)
-        tools_menu.add_command(label="Firmware flashen", command=self._flash_firmware)
-        tools_menu.add_command(label="EEPROM flashen", command=self._flash_eeprom)
+        tools_menu.add_command(label="Connect Bootloader", command=self._connect_to_bootloader)
+        tools_menu.add_command(label="Flash Firmware", command=self._flash_firmware)
+        tools_menu.add_command(label="Flash EEPROM", command=self._flash_eeprom)
         tools_menu.add_separator()
         tools_menu.add_command(label="Start Application (Bootloader)", command=self._bootloader_start_application)
         menubar.add_cascade(label="Tools", menu=tools_menu)
 
         help_menu = Menu(menubar, tearoff=0)
-        help_menu.add_command(label="Ueber", command=self._show_about)
-        menubar.add_cascade(label="Hilfe", menu=help_menu)
+        help_menu.add_command(label="About", command=self._show_about)
+        menubar.add_cascade(label="Help", menu=help_menu)
 
         help_menu.add_separator()
-        help_menu.add_command(label="Debug-Log oeffnen", command=self._open_log_file)
+        help_menu.add_command(label="Open Debug Log", command=self._open_log_file)
 
         self.configure(menu=menubar)
 
@@ -412,9 +412,9 @@ class BridgeGui(ctk.CTk):
 
         self.connect_btn = ctk.CTkButton(header, text="Connect", width=110, command=self._toggle_connection)
         self.connect_btn.grid(row=0, column=5, padx=(14, 6), pady=10)
-        self._install_tooltip(self.connect_btn, "Serielle Verbindung aufbauen oder trennen")
+        self._install_tooltip(self.connect_btn, "Open or close serial connection")
 
-        self.dtr_switch = ctk.CTkSwitch(header, text="DTR aktiv", command=self._toggle_dtr, state="disabled")
+        self.dtr_switch = ctk.CTkSwitch(header, text="DTR active", command=self._toggle_dtr, state="disabled")
         self.dtr_switch.grid(row=0, column=6, padx=(14, 6), pady=10)
 
         self.dtr_status_bubble = ctk.CTkFrame(
@@ -434,7 +434,7 @@ class BridgeGui(ctk.CTk):
             command=lambda: self._send_bridge_command(self.commands["bridge_set"]["reset"]),
         )
         self.reset_bridge_btn.grid(row=0, column=8, padx=(8, 6), pady=10)
-        self._install_tooltip(self.reset_bridge_btn, "Bridge per -set rsb 1 zuruecksetzen")
+        self._install_tooltip(self.reset_bridge_btn, "Reset bridge via -set rsb 1")
 
         self.processing_label = ctk.CTkLabel(header, text="", font=ctk.CTkFont(size=16, weight="bold"), text_color=("#2f81f7", "#2f81f7"), width=20)
         self.processing_label.grid(row=0, column=9, padx=(12, 12), pady=10)
@@ -500,7 +500,7 @@ class BridgeGui(ctk.CTk):
             command=self._reset_runtime_statistics,
         )
         self.stats_reset_btn.grid(row=0, column=2, padx=(0, 10), pady=(10, 8), sticky="e")
-        self._install_tooltip(self.stats_reset_btn, "Runtime-Statistiken zuruecksetzen")
+        self._install_tooltip(self.stats_reset_btn, "Reset runtime statistics")
 
         bridge_rows = [
             ("RS232 RX Overflows", "rrs", 1, 0),
@@ -612,7 +612,7 @@ class BridgeGui(ctk.CTk):
         ctk.CTkLabel(status_frame, text="Bridge Firmware:").grid(row=0, column=1, padx=(6, 6), pady=8, sticky="w")
         self.bridge_fw_label = ctk.CTkLabel(status_frame, text=self.bridge_fw_version)
         self.bridge_fw_label.grid(row=0, column=2, padx=(0, 10), pady=8, sticky="w")
-        ctk.CTkLabel(status_frame, text="Modus:").grid(row=0, column=3, padx=(6, 6), pady=8, sticky="e")
+        ctk.CTkLabel(status_frame, text="Mode:").grid(row=0, column=3, padx=(6, 6), pady=8, sticky="e")
         self.mode_option = ctk.CTkOptionMenu(
             status_frame,
             values=["Hell", "Dunkel", "Automatisch"],
@@ -644,7 +644,7 @@ class BridgeGui(ctk.CTk):
             command=self._upload_bridge_config,
         )
         self.upload_cfg_btn.grid(row=0, column=4, padx=(8, 6), pady=(8, 10), sticky="e")
-        self._install_tooltip(self.upload_cfg_btn, "Aktuelle Bridge-Parameter auslesen")
+        self._install_tooltip(self.upload_cfg_btn, "Read current bridge parameters")
 
         self.save_cfg_btn = ctk.CTkButton(
             settings_frame,
@@ -656,7 +656,7 @@ class BridgeGui(ctk.CTk):
             command=lambda: self._send_bridge_command(self.commands["bridge_set"]["savecfg"]),
         )
         self.save_cfg_btn.grid(row=0, column=5, padx=(0, 12), pady=(8, 10), sticky="e")
-        self._install_tooltip(self.save_cfg_btn, "Parameter dauerhaft speichern (-set savecfg)")
+        self._install_tooltip(self.save_cfg_btn, "Save parameters permanently (-set savecfg)")
 
         self.param_entries = {}
         buffer_color_map = {
@@ -777,7 +777,7 @@ class BridgeGui(ctk.CTk):
         self.pick_firmware_btn.grid(
             row=2, column=2, padx=(8, 10), pady=6
         )
-        self._install_tooltip(self.pick_firmware_btn, "Firmware-Datei auswaehlen")
+        self._install_tooltip(self.pick_firmware_btn, "Select firmware file")
         self.flash_firmware_btn = ctk.CTkButton(boot_frame, text="Flash Firmware", width=200, command=self._flash_firmware)
         self.flash_firmware_btn.grid(row=2, column=0, padx=(10, 8), pady=6)
         self._install_tooltip(self.flash_firmware_btn, "Firmware in den Controller flashen")
@@ -788,14 +788,14 @@ class BridgeGui(ctk.CTk):
         self.pick_eeprom_btn.grid(
             row=3, column=2, padx=(8, 10), pady=6
         )
-        self._install_tooltip(self.pick_eeprom_btn, "EEPROM-Datei auswaehlen")
+        self._install_tooltip(self.pick_eeprom_btn, "Select EEPROM file")
         self.flash_eeprom_btn = ctk.CTkButton(boot_frame, text="Flash EEPROM", width=200, command=self._flash_eeprom)
         self.flash_eeprom_btn.grid(row=3, column=0, padx=(10, 8), pady=6)
         self._install_tooltip(self.flash_eeprom_btn, "EEPROM-Inhalt flashen")
 
         self.boot_start_app_btn = ctk.CTkButton(boot_frame, text="Start Application", width=200, command=self._bootloader_start_application)
         self.boot_start_app_btn.grid(row=4, column=0, padx=(10, 8), pady=(6, 6))
-        self._install_tooltip(self.boot_start_app_btn, "Bootloader verlassen und Applikation starten")
+        self._install_tooltip(self.boot_start_app_btn, "Exit bootloader and start application")
 
         self.boot_info_label = ctk.CTkLabel(boot_frame, text="Version: -")
         self.boot_info_label.grid(row=4, column=1, padx=8, pady=(6, 6), sticky="w")
@@ -804,7 +804,7 @@ class BridgeGui(ctk.CTk):
         self.boot_progress.grid(row=5, column=1, padx=8, pady=(6, 10), sticky="ew")
         self.boot_progress.set(0)
 
-        self.boot_progress_label = ctk.CTkLabel(boot_frame, text="Fortschritt: 0%")
+        self.boot_progress_label = ctk.CTkLabel(boot_frame, text="Progress: 0%")
         self.boot_progress_label.grid(row=5, column=2, padx=(8, 10), pady=(6, 10), sticky="w")
 
         self.log_boxes["Bootloader"] = ctk.CTkTextbox(
@@ -886,7 +886,7 @@ class BridgeGui(ctk.CTk):
             self.last_rx = text.replace("RX:", "", 1).strip()[:80] or "-"
         if "error" in lowered or "failed" in lowered or "timeout" in lowered:
             self.error_count += 1
-        elif "warn" in lowered or "ungueltig" in lowered:
+        elif "warn" in lowered or "invalid" in lowered:
             self.warn_count += 1
 
         log_entry = f"[{ts}] {text}\n"
@@ -911,7 +911,7 @@ class BridgeGui(ctk.CTk):
             return "tx"
         if "error" in lowered or "failed" in lowered or "timeout" in lowered:
             return "error"
-        if "warn" in lowered or "ungueltig" in lowered:
+        if "warn" in lowered or "invalid" in lowered:
             return "warn"
         return "info"
 
@@ -947,8 +947,8 @@ class BridgeGui(ctk.CTk):
         enabled = bool(self.debug_logging_var.get())
         self.debug_logging_enabled = enabled
         self._save_app_config()
-        state_text = "aktiv" if enabled else "inaktiv"
-        self._log(f"Debug-Ausgaben sind jetzt {state_text}.")
+        state_text = "active" if enabled else "inactive"
+        self._log(f"Debug output is now {state_text}.")
 
     def _refresh_statistics_display(self):
         uptime_s = int(max(0, time.time() - self.app_start_time))
@@ -1265,8 +1265,8 @@ class BridgeGui(ctk.CTk):
         messagebox.showinfo(
             "About",
             "RS232-KLine Bridge Suite\n"
-            "Mit nativer chip45boot2-Integration\n"
-            "(ohne externe EXE).",
+            "With native chip45boot2 integration\n"
+            "(no external EXE).",
         )
 
     def _parse_hex_bytes(self, payload: str):
@@ -1295,12 +1295,12 @@ class BridgeGui(ctk.CTk):
 
     def _send_terminal_payload(self):
         if not self.serial_port or not self.serial_port.is_open:
-            messagebox.showwarning("Nicht verbunden", "Bitte zuerst verbinden.")
+            messagebox.showwarning("Not Connected", "Please connect first.")
             return
 
         payload = self.terminal_input_entry.get().strip()
         if not payload:
-            messagebox.showwarning("Terminal", "Bitte einen Wert eingeben.")
+            messagebox.showwarning("Terminal", "Please enter a value.")
             return
 
         mode = self.terminal_mode_option.get()
@@ -1314,7 +1314,7 @@ class BridgeGui(ctk.CTk):
                 raw = data.encode("utf-8", errors="replace")
             elif mode == "Character":
                 if len(payload) != 1:
-                    messagebox.showwarning("Character Mode", "Bitte genau ein Zeichen eingeben.")
+                    messagebox.showwarning("Character Mode", "Please enter exactly one character.")
                     return
                 data = payload + ("\n" if append_newline else "")
                 raw = data.encode("utf-8", errors="replace")
@@ -1344,17 +1344,17 @@ class BridgeGui(ctk.CTk):
 
         raw_value = self.kline_pulse_entry.get().strip()
         if not raw_value:
-            messagebox.showwarning("KLine Pulse", "Bitte einen Pulse-Wert in ms eingeben (0..65535).")
+            messagebox.showwarning("KLine Pulse", "Please enter a pulse value in ms (0..65535).")
             return
 
         try:
             pulse_ms = int(raw_value, 10)
         except ValueError:
-            messagebox.showwarning("KLine Pulse", "Ungueltiger Zahlenwert. Erlaubt ist 0..65535 ms.")
+            messagebox.showwarning("KLine Pulse", "Invalid numeric value. Allowed range is 0..65535 ms.")
             return
 
         if pulse_ms < 0 or pulse_ms > 0xFFFF:
-            messagebox.showwarning("KLine Pulse", "Der Pulse-Wert muss im Bereich 0..65535 ms liegen.")
+            messagebox.showwarning("KLine Pulse", "Pulse value must be in the range 0..65535 ms.")
             return
 
         self._send_set_command_with_response(
@@ -1451,7 +1451,7 @@ class BridgeGui(ctk.CTk):
         port = self.port_option.get().strip()
         if not port or port == "-":
             msg = "No port selected."
-            messagebox.showwarning("Port fehlt", "Bitte seriellen Port waehlen.")
+            messagebox.showwarning("No Port", "Please select a serial port.")
             return False, f"ERROR: {msg}"
 
         self._close_bootloader_serial()
@@ -1462,7 +1462,7 @@ class BridgeGui(ctk.CTk):
             baud = int(self.baud_combo.get().strip())
         except ValueError:
             msg = "Invalid port baudrate."
-            messagebox.showwarning("Baudrate", "Ungueltige Baudrate.")
+            messagebox.showwarning("Baudrate", "Invalid baudrate.")
             return False, f"ERROR: {msg}"
 
         self.selected_port_baud = self._normalize_baud_value(str(baud), self.DEFAULT_PORT_BAUD)
@@ -1473,7 +1473,7 @@ class BridgeGui(ctk.CTk):
             self.serial_port.dtr = False
         except serial.SerialException as exc:
             msg = str(exc)
-            messagebox.showerror("Connect Fehler", msg)
+            messagebox.showerror("Connection Error", msg)
             return False, f"ERROR: {msg}"
 
         self.reader_stop_event.clear()
@@ -1641,9 +1641,9 @@ class BridgeGui(ctk.CTk):
         if on_connect:
             self.after(0, lambda: [
                 messagebox.showwarning(
-                    "Kein Geraet erkannt",
-                    "Keine Antwort vom Geraet erhalten.\n"
-                    "Moegliche Ursachen: Geraet nicht verbunden, falsche Baudrate oder falscher Port.",
+                    "No Device Detected",
+                    "No response received from device.\n"
+                    "Possible causes: device not connected, wrong baudrate, or wrong port.",
                 ),
                 self._disconnect_serial(),
             ])
@@ -1666,11 +1666,11 @@ class BridgeGui(ctk.CTk):
             if self.BRIDGE_DEVICE_ID not in version:
                 self.after(0, lambda v=version: [
                     messagebox.showwarning(
-                        "Geraet nicht erkannt",
-                        f"Die Geraeteantwort entspricht nicht dem erwarteten Bridge-Geraet.\n\n"
-                        f"Erwartet: '...{self.BRIDGE_DEVICE_ID}...'\n"
-                        f"Erhalten:  '{v}'\n\n"
-                        f"Bitte Port und Baudrate pruefen.",
+                        "Device Not Recognized",
+                        f"The response does not match the expected bridge device.\n\n"
+                        f"Expected: '...{self.BRIDGE_DEVICE_ID}...'\n"
+                        f"Received: '{v}'\n\n"
+                        "Please check port and baudrate.",
                     ),
                     self._disconnect_serial(),
                 ])
@@ -1738,12 +1738,12 @@ class BridgeGui(ctk.CTk):
     def _can_send_bridge_commands(self, show_warnings: bool = True) -> bool:
         if not self.serial_port or not self.serial_port.is_open:
             if show_warnings:
-                messagebox.showwarning("Nicht verbunden", "Bitte zuerst verbinden.")
+                messagebox.showwarning("Not Connected", "Please connect first.")
             return False
 
         if not bool(self.dtr_switch.get()):
             if show_warnings:
-                messagebox.showwarning("DTR inaktiv", "Kommandos duerfen nur bei aktivem DTR gesendet werden.")
+                messagebox.showwarning("DTR Inactive", "Commands may only be sent when DTR is active.")
             return False
 
         return True
@@ -1764,7 +1764,7 @@ class BridgeGui(ctk.CTk):
             if not ok:
                 self._log(f"DEBUG set_cmd transport-fail: cmd='{command}', result='{response}'")
                 if show_warnings:
-                    messagebox.showwarning("Bridge", f"Keine gueltige Antwort fuer {command}: {response}")
+                    messagebox.showwarning("Bridge", f"No valid response for {command}: {response}")
                 return False
 
             self._log(f"DEBUG set_cmd rx: raw='{response}'")
@@ -1794,7 +1794,7 @@ class BridgeGui(ctk.CTk):
         value = self._resolve_param_value(command, raw_value)
         if not value:
             if show_warnings:
-                messagebox.showwarning("Wert fehlt", f"Bitte Wert fuer {command} eintragen.")
+                messagebox.showwarning("Missing Value", f"Please enter a value for {command}.")
             return
 
         if command in {
@@ -1936,21 +1936,21 @@ class BridgeGui(ctk.CTk):
         try:
             numeric_value = int(value, 10)
         except ValueError:
-            return False, "Buffergroessen muessen numerisch sein (16..1024)."
+            return False, "Buffer size must be numeric (16..1024)."
 
         if numeric_value < 0:
-            return False, "Negative Buffergroessen sind nicht zulaessig."
+            return False, "Negative buffer sizes are not allowed."
 
         if numeric_value < 16 or numeric_value > 1024:
-            return False, "Buffergroessen muessen im Bereich 16..1024 liegen."
+            return False, "Buffer size must be in the range 16..1024."
 
         if numeric_value not in self.buffer_allowed_values:
-            return False, "Zulaessig sind nur 16, 32, 64, 128, 256, 512 und 1024."
+            return False, "Allowed values are 16, 32, 64, 128, 256, 512, and 1024."
 
         signed_value = numeric_value if numeric_value < 0x8000 else numeric_value - 0x10000
         roundtrip = signed_value & 0xFFFF
         if roundtrip != numeric_value:
-            return False, "Ungueltiger Zweierkomplement-Wert fuer 16-Bit Buffergroesse."
+            return False, "Invalid two's complement value for 16-bit buffer size."
 
         return True, ""
 
@@ -1970,7 +1970,7 @@ class BridgeGui(ctk.CTk):
 
     def _pick_firmware(self):
         file_path = filedialog.askopenfilename(
-            title="Firmware waehlen",
+            title="Select Firmware",
             filetypes=[("Hex/Bin", "*.hex *.bin"), ("All files", "*.*")],
         )
         if file_path:
@@ -1979,7 +1979,7 @@ class BridgeGui(ctk.CTk):
 
     def _pick_eeprom(self):
         file_path = filedialog.askopenfilename(
-            title="EEPROM Datei waehlen",
+            title="Select EEPROM File",
             filetypes=[("Hex/Bin", "*.hex *.bin"), ("All files", "*.*")],
         )
         if file_path:
@@ -1991,12 +1991,12 @@ class BridgeGui(ctk.CTk):
         port = self.port_option.get().strip()
         baud_text = self.baud_combo.get().strip()
         if not port or port == "-":
-            messagebox.showwarning("Port fehlt", "Bitte seriellen Port waehlen.")
+            messagebox.showwarning("No Port", "Please select a serial port.")
             return
         try:
             baud = int(baud_text)
         except ValueError:
-            messagebox.showwarning("Baudrate", "Ungueltige Port-Baudrate.")
+            messagebox.showwarning("Baudrate", "Invalid port baudrate.")
             return
 
         self.boot_connect_btn.configure(state="disabled")
@@ -2129,23 +2129,23 @@ class BridgeGui(ctk.CTk):
 
     def _start_flash(self, mode: str):
         if not self.bootloader_ready:
-            messagebox.showwarning("Bootloader", "Bitte zuerst 'Connect to Bootloader' ausfuehren.")
+            messagebox.showwarning("Bootloader", "Please run 'Connect to Bootloader' first.")
             return
 
         port = self.port_option.get().strip()
         if not port or port == "-":
-            messagebox.showwarning("Port fehlt", "Bitte seriellen Port waehlen.")
+            messagebox.showwarning("No Port", "Please select a serial port.")
             return
 
         if mode == "firmware":
             image_path = self.fw_path_entry.get().strip()
             if not image_path or not os.path.isfile(image_path):
-                messagebox.showwarning("Firmware", "Bitte gueltige Firmware-Datei auswaehlen.")
+                messagebox.showwarning("Firmware", "Please select a valid firmware file.")
                 return
         else:
             image_path = self.eeprom_path_entry.get().strip()
             if not image_path or not os.path.isfile(image_path):
-                messagebox.showwarning("EEPROM", "Bitte gueltige EEPROM-Datei auswaehlen.")
+                messagebox.showwarning("EEPROM", "Please select a valid EEPROM file.")
                 return
 
         self._set_flash_busy(True)
@@ -2166,7 +2166,7 @@ class BridgeGui(ctk.CTk):
     def _set_boot_progress(self, value: float):
         clamped = max(0.0, min(1.0, value))
         self.boot_progress.set(clamped)
-        self.boot_progress_label.configure(text=f"Fortschritt: {int(clamped * 100)}%")
+        self.boot_progress_label.configure(text=f"Progress: {int(clamped * 100)}%")
 
     def _bootloader_program_worker(self, mode: str, hex_path: str):
         try:
@@ -2177,7 +2177,7 @@ class BridgeGui(ctk.CTk):
             return
 
         if not records:
-            self._log("HEX file enthaelt keine Datenrecords.")
+            self._log("HEX file contains no data records.")
             self.after(0, lambda: self._set_flash_busy(False))
             return
 
@@ -2354,7 +2354,7 @@ class BridgeGui(ctk.CTk):
     def _bootloader_start_application(self):
         ser = self.bootloader_serial
         if not self.bootloader_ready or ser is None or not ser.is_open:
-            messagebox.showwarning("Bootloader", "Bootloader ist nicht verbunden.")
+            messagebox.showwarning("Bootloader", "Bootloader is not connected.")
             return
 
         try:
