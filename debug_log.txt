@@ -1,5 +1,8 @@
-[18:07:00] DEBUG param set echo start: cmd='-set krx 64'
-[18:07:00] DEBUG await start: key='set_rsp', cmd='-set krx 64', timeout=2.00s, event_id=1533533884944
-[18:07:00] TX: -set krx 64
-[18:07:00] RX: 64
-[18:07:02] DEBUG await timeout: key='set_rsp', cmd='-set krx 64', event_id=1533533884944
+[22:13:37] DEBUG savecfg start: cmd='-set scg 1'
+[22:13:37] DEBUG await start: key='set_rsp', cmd='-set scg 1', timeout=2.00s, event_id=2461703768144
+[22:13:37] TX: -set scg 1
+[22:13:37] RX: 1
+[22:13:37] DEBUG await done: key='set_rsp', cmd='-set scg 1', value='1', event_id=2461703768144
+[22:13:37] DEBUG savecfg response: cmd='-set scg 1', response='1'
+[22:13:37] Config save acknowledged: -set scg 1 -> 1
+[22:13:37] DEBUG await accept(set_rsp): msg='1', event_id=2461703768144
