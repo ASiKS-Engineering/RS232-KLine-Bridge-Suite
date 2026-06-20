@@ -1006,7 +1006,7 @@ class BridgeGui(ctk.CTk):
                 self.after_cancel(self.param_refresh_after_id)
             except Exception:
                 pass
-        # Debounce repeated replies so rapid ACK bursts trigger only one refresh cycle.
+        # Debounce repeated replies so rapid response bursts trigger only one refresh cycle.
         self.param_refresh_after_id = self.after(220, self._start_param_auto_refresh)
 
     def _start_param_auto_refresh(self):
@@ -1523,7 +1523,6 @@ class BridgeGui(ctk.CTk):
                         msg = repr(data)
                     accepted_key = None
                     accepted_event = None
-                    schedule_auto_refresh = False
                     ignored_reason = ""
 
                     # Handle awaited response first, before any logging that can block on GUI/file I/O.
@@ -1535,28 +1534,13 @@ class BridgeGui(ctk.CTk):
                         )
 
                         if can_process:
-                            if response_key == "set_ack":
-                                if self._is_set_ack_response(msg):
-                                    self.awaiting_response_value = msg
-                                    accepted_key = response_key
-                                    accepted_event = response_event
-                                    schedule_auto_refresh = self._is_set_success_response(msg)
-                                else:
-                                    ignored_reason = "set_ack-not-ack"
-                            elif response_key in {"set_rsp", "set_resp"}:
+                            if response_key in {"set_rsp", "set_resp", "reset_rsp"}:
                                 if self._is_set_response_message(msg):
                                     self.awaiting_response_value = msg
                                     accepted_key = response_key
                                     accepted_event = response_event
                                 else:
                                     ignored_reason = self._describe_set_response_match(msg)
-                            elif response_key == "reset_ack":
-                                if self._is_reset_ack_response(msg):
-                                    self.awaiting_response_value = msg
-                                    accepted_key = response_key
-                                    accepted_event = response_event
-                                else:
-                                    ignored_reason = "reset_ack-not-ack"
                             else:
                                 self.awaiting_response_value = msg
                                 if response_key in self.bridge_stats_values:
@@ -1570,14 +1554,12 @@ class BridgeGui(ctk.CTk):
                     self._log(f"RX: {msg}")
                     if accepted_key is not None:
                         self._log(f"DEBUG await accept({accepted_key}): msg='{msg}', event_id={id(accepted_event)}")
-                        if schedule_auto_refresh:
-                            self.after(0, self._schedule_param_auto_refresh)
                     elif ignored_reason and response_key == "set_rsp":
                         self._log(f"DEBUG set_rsp ignore: raw='{msg}', reason={ignored_reason}")
                     elif ignored_reason and response_key == "set_resp":
                         self._log(f"DEBUG set_resp ignore: raw='{msg}', reason={ignored_reason}")
-                    elif ignored_reason and response_key == "set_ack":
-                        self._log(f"DEBUG set_ack ignore: '{msg}'")
+                    elif ignored_reason and response_key == "reset_rsp":
+                        self._log(f"DEBUG reset_rsp ignore: raw='{msg}', reason={ignored_reason}")
                     if self.awaiting_version_response and msg:
                         if self.version_timeout_after_id is not None:
                             try:
@@ -1664,20 +1646,6 @@ class BridgeGui(ctk.CTk):
         filtered = "".join(ch for ch in raw if ch >= " " or ch == "\t")
         return " ".join(filtered.split())
 
-    def _is_set_ack_response(self, message: str) -> bool:
-        return self._is_set_success_response(message) or self._is_set_error_response(message)
-
-    def _is_set_success_response(self, message: str) -> bool:
-        normalized = self._normalize_ack_text(message)
-        if not normalized:
-            return False
-        tokens = normalized.replace(":", " ").replace(";", " ").replace(",", " ").split()
-        if any(token in {"ACK"} for token in tokens):
-            return True
-        if normalized == "ACK":
-            return True
-        return False
-
     def _is_set_error_response(self, message: str) -> bool:
         normalized = self._normalize_ack_text(message)
         if not normalized:
@@ -1698,13 +1666,11 @@ class BridgeGui(ctk.CTk):
         return self._extract_numeric_value(message) is not None
 
     def _is_set_response_message(self, message: str) -> bool:
-        """Valid response for -set flows: ACK/ERR tokens or numeric echoes."""
-        return self._is_set_ack_response(message) or self._is_set_value_echo_response(message)
+        """Valid response for -set flows: ERR tokens or numeric echoes."""
+        return self._is_set_error_response(message) or self._is_set_value_echo_response(message)
 
     def _describe_set_response_match(self, message: str) -> str:
         """Return why a message was (not) classified as a set response for debugging."""
-        if self._is_set_success_response(message):
-            return "ack-success"
         if self._is_set_error_response(message):
             return "ack-error"
         numeric = self._extract_numeric_value(message)
@@ -1720,21 +1686,16 @@ class BridgeGui(ctk.CTk):
                 return key
         return None
 
-    def _is_reset_ack_response(self, message: str) -> bool:
-        return self._is_set_success_response(message) or self._is_set_error_response(message)
-
     def _send_reset_and_wait_success(self, timeout: float = 0.05) -> tuple[bool, str]:
         self._set_processing(True)
         try:
-            ok, response = self._query_bridge_value(self.commands["bridge_set"]["reset"], "reset_ack", timeout=timeout)
+            ok, response = self._query_bridge_value(self.commands["bridge_set"]["reset"], "reset_rsp", timeout=timeout)
             if not ok:
                 return False, response
 
-            if self._is_set_success_response(response):
-                return True, response
             if self._is_set_error_response(response):
                 return False, response
-            return False, f"Unerwartete Reset-Antwort: {response}"
+            return True, response
         finally:
             self._set_processing(False)
 
@@ -2015,7 +1976,7 @@ class BridgeGui(ctk.CTk):
             self._log("Bootloader connect: bridge connection established.")
             time.sleep(0.2)  # Give reader thread time to start
 
-        # Avoid a parallel version request while waiting for reset ACK.
+        # Avoid a parallel version request while waiting for reset response.
         self._cancel_version_request()
 
         # Check DTR is active
@@ -2024,12 +1985,12 @@ class BridgeGui(ctk.CTk):
             self.boot_connect_btn.configure(state="normal")
             return
 
-        # Send reset command and wait explicitly for SUCCESS.
+        # Send reset command and wait for a regular set-style response (echo or ERR).
         ok, reset_response = self._send_reset_and_wait_success(timeout=0.05)
         if not ok:
             if reset_response == "TIMEOUT":
-                # Some bridge firmware resets immediately and never returns a textual ACK.
-                self._log("WARN: Reset ACK timeout; continuing with bootloader connect.")
+                # Some bridge firmware resets immediately and never returns a textual response.
+                self._log("WARN: Reset response timeout; continuing with bootloader connect.")
             else:
                 self._log(f"ERROR: Reset command failed: {reset_response}")
                 self.boot_connect_btn.configure(state="normal")
