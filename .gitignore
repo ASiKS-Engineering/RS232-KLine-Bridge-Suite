@@ -1,3 +1,5 @@
 .venv
 assets
 __pycache__
+app_config.json
+debug_log.txt

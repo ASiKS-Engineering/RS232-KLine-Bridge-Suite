@@ -1,0 +1,7 @@
+{
+  "ui_mode": "Automatic",
+  "port_baud": "19200",
+  "rs232_baud": "19200",
+  "debug_logging": false,
+  "last_port": "COM3"
+}
