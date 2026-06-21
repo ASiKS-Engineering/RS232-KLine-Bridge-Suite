@@ -1,4 +1,4 @@
-# RS232-KLine Bridge Suite
+# RS232-KLine-Bridge Suite
 
 Graphical User Interface for controlling and monitoring ASiKS-Engineering's RS232-KLine-Bridge.
 
