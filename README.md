@@ -1,10 +1,10 @@
 # RS232-KLine Bridge Suite
 
-GUI for controlling and monitoring an RS232/K-Line bridge and its bootloader.
+Graphical User Interface for controlling and monitoring ASiKS-Engineering's RS232-KLine-Bridge.
 
 ## Features
 
-- Connect and disconnect from the serial bridge
+- Connect and disconnect from RS232-KLine-Bridge
 - Select COM port and port baud rate
 - Toggle DTR and monitor its state
 - Send bridge commands for configuration and reset
