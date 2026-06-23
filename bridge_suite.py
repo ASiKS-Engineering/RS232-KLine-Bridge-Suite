@@ -13,6 +13,8 @@ import customtkinter as ctk
 import serial
 import serial.tools.list_ports
 
+from CTkMessagebox import CTkMessagebox
+
 
 ctk.set_appearance_mode("system")
 ctk.set_default_color_theme("dark-blue")
@@ -926,14 +928,16 @@ class BridgeGui(ctk.CTk):
         """Open the debug log file in the default text editor."""
         try:
             if not os.path.exists(self.log_file_path):
-                messagebox.showinfo("Log File", f"Log file not found at:\n{self.log_file_path}")
+                #messagebox.showinfo("Log File", f"Log file not found at:\n{self.log_file_path}")
+                CTkMessagebox(title="Info", message=f"Log file not found at:\n{self.log_file_path}")
                 return
             if os.name == "nt":  # Windows
                 os.startfile(self.log_file_path)
             else:  # Linux/Mac
                 subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", self.log_file_path])
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to open log file: {e}")
+            #messagebox.showerror("Error", f"Failed to open log file: {e}")
+            CTkMessagebox(title="Error", message=f"Failed to open log file: {e}", icon="cancel")
 
     def _disable_dtr_for_terminal(self):
         if not self.serial_port or not self.serial_port.is_open:
@@ -1023,13 +1027,15 @@ class BridgeGui(ctk.CTk):
         set_ok, set_response = self._query_bridge_value(command, "set_rsp", timeout=2.0)
         if not set_ok:
             self._log(f"DEBUG resetst transport-fail: cmd='{command}', result='{set_response}'")
-            messagebox.showwarning("Bridge", f"No valid response for {command}: {set_response}")
+            #messagebox.showwarning("Bridge", f"No valid response for {command}: {set_response}")
+            CTkMessagebox(title="Warning", message=f"No valid response for {command}: {set_response}", icon="warning")
             return
 
         self._log(f"DEBUG resetst response: cmd='{command}', response='{set_response}'")
         if self._is_set_error_response(set_response):
             self._log(f"Bridge statistics reset rejected: {command} -> {set_response}")
-            messagebox.showwarning("Bridge ERR", f"Bridge rejected statistics reset: {set_response}")
+            #messagebox.showwarning("Bridge ERR", f"Bridge rejected statistics reset: {set_response}")
+            CTkMessagebox(title="Warning", message=f"Bridge rejected statistics reset: {set_response}", icon="warning")
             return
 
         self._log(f"Bridge statistics reset acknowledged: {command} -> {set_response}")
@@ -1095,6 +1101,10 @@ class BridgeGui(ctk.CTk):
         if not self._can_send_bridge_commands():
             return
 
+        res = CTkMessagebox(title="Warning", message="Changing parameters is dangerous! Changes to the baud rate only take effect after a reset! Continue?", icon="warning", option_1="No", option_2="Yes")
+        if res.get() == "No":
+            return
+    
         command = f"{self.commands['bridge_set']['savecfg']} 1"
         self._log(f"DEBUG savecfg start: cmd='{command}'")
         set_ok, set_response = self._query_bridge_value(command, "set_rsp", timeout=2.0)
@@ -2129,7 +2139,7 @@ class BridgeGui(ctk.CTk):
             self._log("ERROR: DTR not active. Cannot send reset command.")
             self.boot_connect_btn.configure(state="normal")
             return
-
+        
         # Send reset command and wait for a regular set-style response (echo or ERR).
         ok, reset_response = self._send_reset_and_wait_success(timeout=0.05)
         if not ok:
