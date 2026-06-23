@@ -928,7 +928,6 @@ class BridgeGui(ctk.CTk):
         """Open the debug log file in the default text editor."""
         try:
             if not os.path.exists(self.log_file_path):
-                #messagebox.showinfo("Log File", f"Log file not found at:\n{self.log_file_path}")
                 CTkMessagebox(title="Info", message=f"Log file not found at:\n{self.log_file_path}")
                 return
             if os.name == "nt":  # Windows
@@ -936,7 +935,6 @@ class BridgeGui(ctk.CTk):
             else:  # Linux/Mac
                 subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", self.log_file_path])
         except Exception as e:
-            #messagebox.showerror("Error", f"Failed to open log file: {e}")
             CTkMessagebox(title="Error", message=f"Failed to open log file: {e}", icon="cancel")
 
     def _disable_dtr_for_terminal(self):
@@ -1027,14 +1025,12 @@ class BridgeGui(ctk.CTk):
         set_ok, set_response = self._query_bridge_value(command, "set_rsp", timeout=2.0)
         if not set_ok:
             self._log(f"DEBUG resetst transport-fail: cmd='{command}', result='{set_response}'")
-            #messagebox.showwarning("Bridge", f"No valid response for {command}: {set_response}")
             CTkMessagebox(title="Warning", message=f"No valid response for {command}: {set_response}", icon="warning")
             return
 
         self._log(f"DEBUG resetst response: cmd='{command}', response='{set_response}'")
         if self._is_set_error_response(set_response):
             self._log(f"Bridge statistics reset rejected: {command} -> {set_response}")
-            #messagebox.showwarning("Bridge ERR", f"Bridge rejected statistics reset: {set_response}")
             CTkMessagebox(title="Warning", message=f"Bridge rejected statistics reset: {set_response}", icon="warning")
             return
 
@@ -1110,13 +1106,13 @@ class BridgeGui(ctk.CTk):
         set_ok, set_response = self._query_bridge_value(command, "set_rsp", timeout=2.0)
         if not set_ok:
             self._log(f"DEBUG savecfg transport-fail: cmd='{command}', result='{set_response}'")
-            messagebox.showwarning("Bridge", f"No valid response for {command}: {set_response}")
+            CTkMessagebox(title="Warning", message=f"No valid response for {command}: {set_response}")
             return
 
         self._log(f"DEBUG savecfg response: cmd='{command}', response='{set_response}'")
         if self._is_set_error_response(set_response):
             self._log(f"Save rejected: {command} -> {set_response}")
-            messagebox.showwarning("Bridge ERR", f"Bridge rejected config save: {set_response}")
+            CTkMessagebox(title="Error", message=f"Bridge rejected config save: {set_response}")
             return
 
         self._log(f"Config save acknowledged: {command} -> {set_response}")
@@ -1381,11 +1377,10 @@ class BridgeGui(ctk.CTk):
             self.after(0, lambda: self.stats_refresh_btn.configure(state="normal"))
 
     def _show_about(self):
-        messagebox.showinfo(
-            "About",
-            "RS232-KLine Bridge Suite\n"
+        CTkMessagebox(title="About", 
+            essage="RS232-KLine Bridge Suite\n"
             "With native chip45boot2 integration\n"
-            "(no external EXE).",
+            "(no external EXE)."
         )
 
     def _parse_hex_bytes(self, payload: str):
@@ -1414,12 +1409,12 @@ class BridgeGui(ctk.CTk):
 
     def _send_terminal_payload(self):
         if not self.serial_port or not self.serial_port.is_open:
-            messagebox.showwarning("Not Connected", "Please connect first.")
+            CTkMessagebox(title="Warning", message="Not Connected\n Please connect first.")
             return
 
         payload = self.terminal_input_entry.get().strip()
         if not payload:
-            messagebox.showwarning("Terminal", "Please enter a value.")
+            CTkMessagebox(title="Warning", message="Terminal\nPlease enter a value.")
             return
 
         mode = self.terminal_mode_option.get()
@@ -1433,7 +1428,7 @@ class BridgeGui(ctk.CTk):
                 raw = data.encode("utf-8", errors="replace")
             elif mode == "Character":
                 if len(payload) != 1:
-                    messagebox.showwarning("Character Mode", "Please enter exactly one character.")
+                    CTkMessagebox(title="Warning", message="Character Mode\nPlease enter exactly one character.")
                     return
                 data = payload + ("\n" if append_newline else "")
                 raw = data.encode("utf-8", errors="replace")
@@ -1447,7 +1442,7 @@ class BridgeGui(ctk.CTk):
             self._log(f"TX: {payload}")
             self.terminal_input_entry.delete(0, "end")
         except ValueError as exc:
-            messagebox.showwarning("Hex Mode", str(exc))
+            CTkMessagebox(title="Warning", message=f"Hex Mode {str(exc)}")
         except serial.SerialException as exc:
             self._log(f"Serial write error: {exc}")
 
@@ -1463,17 +1458,17 @@ class BridgeGui(ctk.CTk):
 
         raw_value = self.kline_pulse_entry.get().strip()
         if not raw_value:
-            messagebox.showwarning("KLine Pulse", "Please enter a pulse value in ms (0..65535).")
+            CTkMessagebox(title="Warning", message="KLine Pulse\nPlease enter a pulse value in ms (0..65535).")
             return
 
         try:
             pulse_ms = int(raw_value, 10)
         except ValueError:
-            messagebox.showwarning("KLine Pulse", "Invalid numeric value. Allowed range is 0..65535 ms.")
+            CTkMessagebox(title="Warning", message="KLine Pulse\nInvalid numeric value. Allowed range is 0..65535 ms.")
             return
 
         if pulse_ms < 0 or pulse_ms > 0xFFFF:
-            messagebox.showwarning("KLine Pulse", "Pulse value must be in the range 0..65535 ms.")
+            CTkMessagebox(title="Warning", message="KLine Pulse\nPulse value must be in the range 0..65535 ms.")
             return
 
         self._send_set_command_with_response(
@@ -1570,7 +1565,7 @@ class BridgeGui(ctk.CTk):
         port = self.port_option.get().strip()
         if not port or port == "-":
             msg = "No port selected."
-            messagebox.showwarning("No Port", "Please select a serial port.")
+            CTkMessagebox(title="Warning", message="No Port\nPlease select a serial port.")
             return False, f"ERROR: {msg}"
 
         self._close_bootloader_serial()
@@ -1581,7 +1576,7 @@ class BridgeGui(ctk.CTk):
             baud = int(self.baud_combo.get().strip())
         except ValueError:
             msg = "Invalid port baudrate."
-            messagebox.showwarning("Baudrate", "Invalid baudrate.")
+            CTkMessagebox(title="Warning", message="Invalid baudrate.")
             return False, f"ERROR: {msg}"
 
         self.selected_port_baud = self._normalize_baud_value(str(baud), self.DEFAULT_PORT_BAUD)
@@ -1592,7 +1587,7 @@ class BridgeGui(ctk.CTk):
             self.serial_port.dtr = False
         except serial.SerialException as exc:
             msg = str(exc)
-            messagebox.showerror("Connection Error", msg)
+            CTkMessagebox(title="Error", message=f"Connection Error {msg}")
             return False, f"ERROR: {msg}"
 
         self.reader_stop_event.clear()
@@ -1759,11 +1754,7 @@ class BridgeGui(ctk.CTk):
         self._log("Version request timeout.")
         if on_connect:
             self.after(0, lambda: [
-                messagebox.showwarning(
-                    "No Device Detected",
-                    "No response received from device.\n"
-                    "Possible causes: device not connected, wrong baudrate, or wrong port.",
-                ),
+                CTkMessagebox(title="Warning", message="No Device Detected\nNo response received from device.\nPossible causes: device not connected, wrong baudrate, or wrong port."),
                 self._disconnect_serial(),
             ])
 
@@ -1784,13 +1775,7 @@ class BridgeGui(ctk.CTk):
             self.version_request_on_connect = False
             if self.BRIDGE_DEVICE_ID not in version:
                 self.after(0, lambda v=version: [
-                    messagebox.showwarning(
-                        "Device Not Recognized",
-                        f"The response does not match the expected bridge device.\n\n"
-                        f"Expected: '...{self.BRIDGE_DEVICE_ID}...'\n"
-                        f"Received: '{v}'\n\n"
-                        "Please check port and baudrate.",
-                    ),
+                    CTkMessagebox(title="Info", message=f"Log file not found at:\n{self.log_file_path}"),
                     self._disconnect_serial(),
                 ])
         self._refresh_statistics_display()
@@ -1857,12 +1842,12 @@ class BridgeGui(ctk.CTk):
     def _can_send_bridge_commands(self, show_warnings: bool = True) -> bool:
         if not self.serial_port or not self.serial_port.is_open:
             if show_warnings:
-                messagebox.showwarning("Not Connected", "Please connect first.")
+                CTkMessagebox(title="Warning", message="Not Connected\nPlease connect first.")
             return False
 
         if not bool(self.dtr_switch.get()):
             if show_warnings:
-                messagebox.showwarning("DTR Inactive", "Commands may only be sent when DTR is active.")
+                CTkMessagebox(title="Warning", message="DTR Inactive\nCommands may only be sent when DTR is active.")
             return False
 
         return True
@@ -1883,7 +1868,7 @@ class BridgeGui(ctk.CTk):
             if not ok:
                 self._log(f"DEBUG set_cmd transport-fail: cmd='{command}', result='{response}'")
                 if show_warnings:
-                    messagebox.showwarning("Bridge", f"No valid response for {command}: {response}")
+                    CTkMessagebox(title="Warning", message=f"No valid response for {command}: {response}")
                 return False
 
             self._log(f"DEBUG set_cmd rx: raw='{response}'")
@@ -1893,7 +1878,7 @@ class BridgeGui(ctk.CTk):
                 self._log(f"DEBUG set_cmd classified: ERROR for cmd='{command}'")
                 self._log(f"Set rejected: {command} -> {response}")
                 if show_warnings:
-                    messagebox.showwarning("Bridge ERR", f"Bridge hat den Wert abgelehnt: {response}")
+                    CTkMessagebox(title="Error", message=f"Bridge hat den Wert abgelehnt: {response}")
                 return False
 
             # Any other response is treated as success (device acknowledged by responding)
@@ -1913,7 +1898,7 @@ class BridgeGui(ctk.CTk):
         value = self._resolve_param_value(command, raw_value)
         if not value:
             if show_warnings:
-                messagebox.showwarning("Missing Value", f"Please enter a value for {command}.")
+                CTkMessagebox(title="Warning", message=f"Please enter a value for {command}.")
             return
 
         if command in {
@@ -1925,7 +1910,7 @@ class BridgeGui(ctk.CTk):
             is_valid, error_message = self._validate_buffer_twos_complement(value)
             if not is_valid:
                 if show_warnings:
-                    messagebox.showwarning("Buffer-Wert", error_message)
+                    CTkMessagebox(title="Warning", message=error_message)
                 return
 
         cmd = f"{command} {value}"
@@ -1938,7 +1923,7 @@ class BridgeGui(ctk.CTk):
             finally:
                 self.suspend_param_autosend = False
             if show_warnings:
-                messagebox.showwarning("Bridge", f"Keine Antwort fuer {cmd}: {set_response}")
+                CTkMessagebox(title="Warning", message=f"Keine Antwort fuer {cmd}: {set_response}")
             self._update_buffer_fill_indicator()
             return
 
@@ -1950,7 +1935,7 @@ class BridgeGui(ctk.CTk):
             finally:
                 self.suspend_param_autosend = False
             if show_warnings:
-                messagebox.showwarning("Bridge ERR", f"Bridge hat den Wert abgelehnt: {set_response}")
+                CTkMessagebox(title="Error", message=f"Bridge hat den Wert abgelehnt: {set_response}")
             self._update_buffer_fill_indicator()
             return
 
@@ -2110,12 +2095,12 @@ class BridgeGui(ctk.CTk):
         port = self.port_option.get().strip()
         baud_text = self.baud_combo.get().strip()
         if not port or port == "-":
-            messagebox.showwarning("No Port", "Please select a serial port.")
+            CTkMessagebox(title="Warning", message="No Port")
             return
         try:
             baud = int(baud_text)
         except ValueError:
-            messagebox.showwarning("Baudrate", "Invalid port baudrate.")
+            CTkMessagebox(title="Warning", message="Invalid port baudrate.")
             return
 
         self.boot_connect_btn.configure(state="disabled")
@@ -2248,23 +2233,23 @@ class BridgeGui(ctk.CTk):
 
     def _start_flash(self, mode: str):
         if not self.bootloader_ready:
-            messagebox.showwarning("Bootloader", "Please run 'Connect to Bootloader' first.")
+            CTkMessagebox(title="Warning", message="Please run 'Connect to Bootloader' first.")
             return
 
         port = self.port_option.get().strip()
         if not port or port == "-":
-            messagebox.showwarning("No Port", "Please select a serial port.")
+            CTkMessagebox(title="Warning", message="Please select a serial port.")
             return
 
         if mode == "firmware":
             image_path = self.fw_path_entry.get().strip()
             if not image_path or not os.path.isfile(image_path):
-                messagebox.showwarning("Firmware", "Please select a valid firmware file.")
+                CTkMessagebox(title="Warning", message="Please select a valid firmware file.")
                 return
         else:
             image_path = self.eeprom_path_entry.get().strip()
             if not image_path or not os.path.isfile(image_path):
-                messagebox.showwarning("EEPROM", "Please select a valid EEPROM file.")
+                CTkMessagebox(title="Warning", message="Please select a valid EEPROM file.")
                 return
 
         self._set_flash_busy(True)
@@ -2473,7 +2458,7 @@ class BridgeGui(ctk.CTk):
     def _bootloader_start_application(self):
         ser = self.bootloader_serial
         if not self.bootloader_ready or ser is None or not ser.is_open:
-            messagebox.showwarning("Bootloader", "Bootloader is not connected.")
+            CTkMessagebox(title="Warning", message="Bootloader is not connected.")
             return
 
         try:
