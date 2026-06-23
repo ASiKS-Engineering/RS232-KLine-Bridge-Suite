@@ -62,7 +62,7 @@ class BridgeGui(ctk.CTk):
         self.log_queue = queue.Queue()
         self.bootloader_serial = None
         self.bootloader_version = ""
-        self.serial_baud_values = ["10400", "300", "600", "1200", "2400", "4800", "9600", "14400", "19200", "28800", "38400", "57600", "115200", "230400", "460800", "921600"]
+        self.serial_baud_values = ["300", "600", "1200", "2400", "4800", "9600", "14400", "19200", "28800", "38400", "57600", "115200", "230400", "460800", "921600"]
         self.param_baud_values = list(self.serial_baud_values)
         self.buffer_allowed_values = [16, 32, 64, 128, 256, 512, 1024]
         self.buffer_labels, self.buffer_value_map = self._build_buffer_labels()

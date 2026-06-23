@@ -789,3 +789,150 @@ Log started: 2026-06-21 20:30:57
 App Version: 1.0.0
 ================================================================================
 [20:31:00] Serial disconnected.
+
+================================================================================
+Log started: 2026-06-21 20:36:43
+App Version: 1.0.0
+================================================================================
+[20:36:46] Serial disconnected.
+
+================================================================================
+Log started: 2026-06-23 08:22:54
+App Version: 1.0.0
+================================================================================
+[08:23:02] Connected to COM3 @ 19200.
+[08:23:02] DTR set to ON (auto).
+[08:23:02] TX: -get ver
+[08:23:02] Version request timeout.
+[08:23:03] Serial disconnected.
+[08:23:06] Connected to COM3 @ 19200.
+[08:23:06] DTR set to ON (auto).
+[08:23:06] TX: -get ver
+[08:23:06] RX: RS232-KLine-Bridge: 1.0.0-g391a329(391a329) built 2026-06-21_20:22
+[08:23:14] Configuration upload started.
+[08:23:14] TX: -get rrx
+[08:23:14] RX: 256
+[08:23:14] TX: -get rtx
+[08:23:14] RX: 128
+[08:23:14] TX: -get rbr
+[08:23:14] RX: 19200
+[08:23:14] TX: -get krx
+[08:23:14] RX: 128
+[08:23:14] TX: -get ktx
+[08:23:14] RX: 256
+[08:23:14] TX: -get kbr
+[08:23:14] RX: 10400
+[08:23:14] TX: -get fwd
+[08:23:14] RX: 1
+[08:23:14] TX: -get bbm
+[08:23:14] RX: 768
+[08:23:14] Configuration upload completed.
+[08:23:21] Bridge snapshot refresh started.
+[08:23:21] TX: -get rrs
+[08:23:21] RX: 0
+[08:23:21] TX: -get rts
+[08:23:21] RX: 0
+[08:23:21] TX: -get krs
+[08:23:21] RX: 0
+[08:23:21] TX: -get kts
+[08:23:21] RX: 0
+[08:23:21] TX: -get rfe
+[08:23:21] RX: 0
+[08:23:21] TX: -get roe
+[08:23:21] RX: 0
+[08:23:21] TX: -get rpe
+[08:23:21] RX: 0
+[08:23:21] TX: -get kfe
+[08:23:21] RX: 0
+[08:23:21] TX: -get koe
+[08:23:21] RX: 0
+[08:23:22] TX: -get kpe
+[08:23:22] RX: 0
+[08:23:22] Bridge snapshot refresh completed.
+[08:23:23] Serial disconnected.
+[08:24:08] Connected to COM3 @ 19200.
+[08:24:08] DTR set to ON (auto).
+[08:24:08] TX: -get ver
+[08:24:08] RX: RS232-KLine-Bridge: 1.0.0-g391a329(391a329) built 2026-06-21_20:22
+[08:24:10] Bridge snapshot refresh started.
+[08:24:10] TX: -get rrs
+[08:24:10] RX: 0
+[08:24:10] TX: -get rts
+[08:24:10] RX: 0
+[08:24:10] TX: -get krs
+[08:24:10] RX: 0
+[08:24:10] TX: -get kts
+[08:24:10] RX: 0
+[08:24:10] TX: -get rfe
+[08:24:10] RX: 42
+[08:24:10] TX: -get roe
+[08:24:10] RX: 0
+[08:24:10] TX: -get rpe
+[08:24:10] RX: 0
+[08:24:10] TX: -get kfe
+[08:24:10] RX: 0
+[08:24:10] TX: -get koe
+[08:24:10] RX: 0
+[08:24:10] TX: -get kpe
+[08:24:10] RX: 0
+[08:24:10] Bridge snapshot refresh completed.
+[08:24:43] Serial disconnected.
+[08:24:44] Connected to COM3 @ 19200.
+[08:24:44] DTR set to ON (auto).
+[08:24:44] TX: -get ver
+[08:24:44] RX: RS232-KLine-Bridge: 1.0.0-g391a329(391a329) built 2026-06-21_20:22
+[08:24:45] Bridge snapshot refresh started.
+[08:24:45] TX: -get rrs
+[08:24:45] RX: 0
+[08:24:45] TX: -get rts
+[08:24:45] RX: 0
+[08:24:45] TX: -get krs
+[08:24:45] RX: 0
+[08:24:45] TX: -get kts
+[08:24:45] RX: 0
+[08:24:45] TX: -get rfe
+[08:24:45] RX: 42
+[08:24:45] TX: -get roe
+[08:24:45] RX: 0
+[08:24:45] TX: -get rpe
+[08:24:45] RX: 0
+[08:24:45] TX: -get kfe
+[08:24:45] RX: 0
+[08:24:45] TX: -get koe
+[08:24:45] RX: 0
+[08:24:45] TX: -get kpe
+[08:24:45] RX: 0
+[08:24:45] Bridge snapshot refresh completed.
+[08:24:46] Runtime statistics reset.
+[08:24:46] TX: -set rst 1
+[08:24:46] RX: 1
+[08:24:46] Bridge statistics reset acknowledged: -set rst 1 -> 1
+[08:24:48] Bridge snapshot refresh started.
+[08:24:48] TX: -get rrs
+[08:24:48] RX: 0
+[08:24:48] TX: -get rts
+[08:24:48] RX: 0
+[08:24:48] TX: -get krs
+[08:24:48] RX: 0
+[08:24:48] TX: -get kts
+[08:24:48] RX: 0
+[08:24:48] TX: -get rfe
+[08:24:48] RX: 0
+[08:24:48] TX: -get roe
+[08:24:48] RX: 0
+[08:24:48] TX: -get rpe
+[08:24:48] RX: 0
+[08:24:48] TX: -get kfe
+[08:24:48] RX: 0
+[08:24:48] TX: -get koe
+[08:24:48] RX: 0
+[08:24:48] TX: -get kpe
+[08:24:48] RX: 0
+[08:24:48] Bridge snapshot refresh completed.
+[08:55:01] Serial disconnected.
+
+================================================================================
+Log started: 2026-06-23 08:59:18
+App Version: 1.0.0
+================================================================================
+[08:59:34] Serial disconnected.
