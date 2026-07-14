@@ -2165,7 +2165,7 @@ class BridgeGui(ctk.CTk):
             ok, version_or_error = self._bootloader_handshake(boot_ser, timeout_s=handshake_timeout)
             if ok:
                 self.bootloader_serial = boot_ser
-                self._log(f"Bootloader connected: {version_or_error}")
+                #self._log(f"Bootloader connected: {version_or_error}")
                 self.after(0, lambda: self._finish_bootloader_connect(True, version_or_error, ""))
                 return
 
@@ -2186,9 +2186,9 @@ class BridgeGui(ctk.CTk):
         self.boot_connect_btn.configure(state="normal")
         if connected:
             self.bootloader_ready = True
-            self.bootloader_version = version
-            self.boot_info_label.configure(text=f"Version: {version}")
-            self._log(f"Bootloader connected ({version}).")
+            self.bootloader_version = version.split(">")[0].strip()
+            self.boot_info_label.configure(text=f"Version: {self.bootloader_version}")
+            self._log(f"Bootloader connected ({self.bootloader_version}).")
         else:
             self.bootloader_ready = False
             self.bootloader_version = ""
