@@ -2126,7 +2126,7 @@ class BridgeGui(ctk.CTk):
             return
         
         # Send reset command and wait for a regular set-style response (echo or ERR).
-        ok, reset_response = self._send_reset_and_wait_success(timeout=0.05)
+        ok, reset_response = self._send_reset_and_wait_success(timeout=0.5)
         if not ok:
             if reset_response == "TIMEOUT":
                 # Some bridge firmware resets immediately and never returns a textual response.
